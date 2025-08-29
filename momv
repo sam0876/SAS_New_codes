@@ -1,0 +1,287 @@
+/* B Score Movement  */
+
+Options compress=yes;
+libname aneesha "/Policy/aneesha.choudhary";
+libname cdw '/BIUSASDATA/BIUDATANAS/Rahul Dasgupta/cdw'; 
+libname charan "/PolicyNew/"; 
+libname Madhuri '/BIUSASDATA/BIUDATANAS/Madhuri Chhabra'; 
+libname shpravee '/Policy/PraveenSingh'; 
+libname cc "/Policy/rajendra.bhoir";
+
+/*DEC'23 VS JUN'24 B-Score Movement */ 
+/* Dec 23 odc 0 cases performance in next 6 months data creation*/
+proc sql;
+CREATE TABLE perf_Dec23_base AS
+select distinct caccserno,
+				peopleserno,
+				overduecycles AS odc_dec23
+from RAJENDRA.PORTFOLIO_DATA_202312
+WHERE overduecycles = 0; QUIT;
+/* NOTE: Table WORK.PERF_DEC23_BASE created, with 2536753 rows and 3 columns. */
+
+
+PROC SQL;
+create table perf_Dec23_base1 as 
+select distinct a.*,
+				b.overduecycles as odc_jan24 
+from perf_dec23_base a
+left join RAJENDRA.PORTFOLIO_DATA_202401 b
+on a.caccserno = b.caccserno; QUIT;
+/* NOTE: Table WORK.PERF_DEC23_BASE1 created, with 2536753 rows and 4 columns. */
+
+
+proc sql;
+create table perf_Dec23_base2 as 
+select distinct a.*,
+				b.overduecycles as odc_feb24 
+from perf_dec23_base1 a
+left join RAJENDRA.PORTFOLIO_DATA_202402 b
+on a.caccserno = b.caccserno;
+Quit;
+/* NOTE: Table WORK.PERF_DEC23_BASE2 created, with 2536753 rows and 5 columns. */
+
+
+proc sql;
+create table perf_dec23_base3 as 
+select distinct a.*,
+				b.overduecycles as odc_mar24
+from perf_dec23_base2 a
+left join RAJENDRA.PORTFOLIO_DATA_202403 b
+on a.caccserno = b.caccserno;
+Quit;
+/* NOTE: Table WORK.PERF_DEC23_BASE3 created, with 2536753 rows and 6 columns. */
+
+
+proc sql;
+create table perf_dec23_base4 as 
+select distinct a.*,
+				b.overduecycles as odc_apr24
+from perf_dec23_base3 a
+left join RAJENDRA.PORTFOLIO_DATA_202404 b
+on a.caccserno = b.caccserno;
+Quit;
+/* NOTE: Table WORK.PERF_DEC23_BASE4 created, with 2536753 rows and 7 columns. */
+
+
+proc sql;
+create table perf_dec23_base5 as 
+select distinct a.*,
+				b.overduecycles as odc_may24
+from perf_dec23_base4 a
+left join rajendra.Portfolio_Data_202405 b
+on a.caccserno = b.caccserno;
+Quit;
+/* NOTE: Table WORK.PERF_DEC23_BASE5 created, with 2536753 rows and 8 columns. */
+
+
+proc sql;
+create table perf_dec23_base6 as 
+select distinct a.*,
+				b.overduecycles as odc_jun24
+from perf_dec23_base5 a
+left join rajendra.PORTFOLIO_DATA_202406 b
+on a.caccserno = b.caccserno;
+Quit;
+/* NOTE: Table WORK.PERF_DEC23_BASE6 created, with 2536753 rows and 9 columns. */
+
+
+data PERF_dec23ODC_BASE;
+set perf_dec23_base6;
+run;
+/* NOTE: The data set WORK.PERF_DEC23ODC_BASE has 2536753 observations and 9 variables. */
+
+
+/*-------------------------------------------------------------------------------------------------------------------*/
+/* If ever Deciles are not avialable in the file then we use below codes to make deciles. */
+
+/* proc freq data=CC.BSCORE_jul23_RE; */
+/* table Prob_bad_bins; */
+/* quit; */
+
+/* Jul 23 Bscore Mapping */
+/* data bscore_jul23; */
+/* set CC.BSCORE_jul23_RE; */
+/* if Prob_bad_bins = '(0.029, 0.543]' then score_band = 9; */
+/* else if Prob_bad_bins = '(0.0143, 0.029]' then score_band= 8; */
+/* else if Prob_bad_bins = '(0.00799, 0.0143]' then score_band = 7; */
+/* else if Prob_bad_bins = '(0.00479, 0.00799]' then score_band = 6; */
+/* else if Prob_bad_bins = '(0.0032300000000000002, 0.00479]' then score_band = 5; */
+/* else if Prob_bad_bins = '(0.00215, 0.0032300000000000002]' then score_band = 4; */
+/* else if Prob_bad_bins = '(0.00142, 0.00215]' then score_band = 3; */
+/* else if Prob_bad_bins = '(0.000923, 0.00142]' then score_band = 2; */
+/* else if Prob_bad_bins = '(0.000527, 0.000923]' then score_band = 1; */
+/* else if Prob_bad_bins = '(-0.000893, 0.000527]' then score_band = 0; */
+/* run; */
+/*-------------------------------------------------------------------------------------------------------------------*/
+
+
+data bscore_dec23;
+set RAJENDRA.BSCORE_dec23_RE;
+	 if decile =   9      then risk_band = "Very High";
+else if decile in (7,8)   then risk_band = "High";
+else if decile in (4,5,6) then risk_band = "Medium";
+else if decile in (2,3)   then risk_band = "Low";
+else if decile in (0,1)   then risk_band = "Very Low";
+else if missing(decile)   then risk_band = "NA";
+run;
+/* NOTE: The data set WORK.BSCORE_DEC23 has 1581426 observations and 7 variables. */
+
+proc freq data = bscore_dec23;
+tables risk_band; RUN;
+
+
+proc sql;
+create table PERF_dec23ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_dec23, 
+				b.decile 
+from PERF_dec23ODC_BASE a
+left join bscore_dec23 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+/* NOTE: Table WORK.PERF_DEC23ODC_BASE1 created, with 2536753 rows and 11 columns. */
+
+proc freq data=PERF_dec23ODC_BASE1;
+table risk_band_dec23;
+quit;
+
+
+/* Oct 23 Dirty Bscore mapping */ 
+data bscore_dec23_DS;
+length segment $20.;
+set RAJENDRA.BSCORE_dec23_DS;
+if Prob_bad > 0 then segment= "Very High +";
+run;
+/* NOTE: The data set WORK.BSCORE_DEC23_DS has 138435 observations and 11 variables. */
+
+
+proc sql;
+create table PERF_dec23ODC_BASE2 as 
+select distinct a.*,
+				b.segment as segment_dec23 
+from PERF_dec23ODC_BASE1 a
+left join bscore_dec23_DS b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+/* NOTE: Table WORK.PERF_NOV23ODC_BASE2 created, with 24,33,454 rows and 12 columns. */
+
+proc freq data = PERF_dec23ODC_BASE2;
+tables segment_dec23;
+Run;
+
+
+data PERF_dec23ODC_BASE3;
+length bscore_dec23_cat $15.;
+set PERF_dec23ODC_BASE2;
+if segment_dec23 in ("Very High +")   then bscore_dec23_cat= "Very High+";
+else if risk_band_dec23 = "Very High" then bscore_dec23_cat= "Very High";
+else if risk_band_dec23 = "High"      then bscore_dec23_cat = "High";
+else if risk_band_dec23 = "Medium"    then bscore_dec23_cat = "Medium";
+else if risk_band_dec23 = "Low" 	  then bscore_dec23_cat = "Low";
+else if risk_band_dec23 = "Very Low"  then bscore_dec23_cat = "Very Low";
+else if missing(risk_band_dec23)      then bscore_dec23_cat = "Blank";
+run;
+/* NOTE: The data set WORK.PERF_NOV23ODC_BASE3 has 24,33,454 observations and 13 variables. */
+
+
+proc freq data = PERF_dec23ODC_BASE3;
+table bscore_dec23_cat;
+quit;
+
+
+/* JUN'24 BScore Mapping */
+data bscore_Jun24;
+set rajendra.BSCORE_jun24_RE;
+if decile = 9 then risk_band= "Very High";
+else if decile in (7,8) then risk_band = "High";
+else if decile in (4,5,6) then risk_band = "Medium";
+else if decile in (2,3) then risk_band = "Low";
+else if decile in (0,1) then risk_band = "Very Low";
+run;
+/* NOTE: The data set WORK.BSCORE_JUN24 has 1789493 observations and 7 variables. */
+
+
+proc sql;
+create table PERF_dec23ODC_BASE4 as 
+select distinct a.*,
+				b.risk_band as risk_band_jun24 
+from PERF_dec23ODC_BASE3 a
+left join bscore_jun24 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+/* NOTE: Table WORK.PERF_DEC23ODC_BASE4 created, with 2536753 rows and 14 columns. */
+
+/* Nov 23 Dirty Bscore mapping */
+/* data bscore_nov23_ds; */
+/* set cc.bscore_nov23_ds; */
+/* if decile in (8,9) then risk_band_ds = "Very High"; */
+/* else if decile in (6,7) then risk_band_ds = "High"; */
+/* else if decile in (3,4,5) then risk_band_ds = "Medium"; */
+/* else if decile in (0,1,2) then risk_band_ds = "Low"; */
+/* run; */
+
+
+data bscore_jun24_ds;
+set rajendra.BSCORE_jun24_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+/* NOTE: The data set WORK.BSCORE_JUN24_DS has 168986 observations and 11 variables. */
+
+
+proc sql;
+create table PERF_dec23ODC_BASE5 as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_jun24
+from PERF_dec23ODC_BASE4 a
+left join bscore_jun24_DS b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+/* NOTE: Table WORK.PERF_DEC23ODC_BASE5 created, with 2536753 rows and 15 columns. */
+
+
+data PERF_dec23ODC_BASE6;
+length bscore_jun24_cat $15.;
+set PERF_dec23ODC_BASE5;
+if risk_band_ds_jun24 in ("Very High+") then bscore_jun24_cat = "Very High+";
+else if risk_band_jun24 = "Very High" 	then bscore_jun24_cat = "Very High";
+else if risk_band_jun24 = "High" 		then bscore_jun24_cat = "High";
+else if risk_band_jun24 = "Medium" 		then bscore_jun24_cat = "Medium";
+else if risk_band_jun24 = "Low" 		then bscore_jun24_cat = "Low";
+else if risk_band_jun24 = "Very Low" 	then bscore_jun24_cat = "Very Low";
+else if missing(risk_band_jun24) 		then bscore_jun24_cat = "Blank";
+run;
+/* NOTE: The data set WORK.PERF_DEC23ODC_BASE6 has 2536753 observations and 16 variables. */
+
+proc freq data= PERF_dec23ODC_BASE6;
+table bscore_jun24_cat/norow nocol nocum;
+run;
+
+proc freq data= PERF_dec23ODC_BASE6;
+table bscore_dec23_cat/norow nocol nocum;
+run;
+
+data PERF_dec23ODC_BASE6;
+set PERF_dec23ODC_BASE6;
+ever_30_max = max(odc_dec23, odc_jan24, odc_feb24, odc_mar24, odc_apr24, odc_may24, odc_jun24);
+run;
+
+data PERF_dec23ODC_BASE6;
+length ever_30_tag $8.;
+set PERF_dec23ODC_BASE6;
+if ever_30_max in (0,1) then ever_30_tag= 0;
+else if ever_30_max in (2,3,4,5,6,7,8) then ever_30_tag= 1;
+run;
+/* NOTE: The data set WORK.PERF_MAY23ODC_BASE6 has 1819132 observations and 16 variables. */
+
+PROC FREQ DATA=PERF_dec23ODC_BASE6;
+TABLE bscore_dec23_cat*bscore_jun24_cat/ nocol norow nopercent;
+RUN;
+
+
+PROC FREQ DATA=PERF_dec23ODC_BASE6;
+TABLE bscore_dec23_cat*ever_30_tag/ nocol norow nopercent;
+RUN;
+
+
+/* Completed here - sequence month's combination is in below */
+
