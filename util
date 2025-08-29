@@ -1,0 +1,325 @@
+proc sql;
+create table UPGRADE_UTILISATION_1 as 
+select distinct 
+a.*,
+b.mo_good_bal as Jul_MoBal_23,
+c.mo_good_bal as Aug_MoBal23,
+d.mo_good_bal as Sep_MoBal23,
+e.mo_good_bal as Oct_MoBal23,
+f.mo_good_bal as Nov_MoBal23,
+g.mo_good_bal as Dec_MoBal23,
+h.mo_good_bal as Jan_MoBal24,
+i.mo_good_bal as Feb_MoBal24,
+j.mo_good_bal as Mar_MoBal24,
+k.mo_good_bal as Apr_MoBal24,
+l.mo_good_bal as May_MoBal24,
+m.mo_good_bal as Jun_MoBal24,
+n.mo_good_bal as Jul_MoBal24,
+o.mo_good_bal as Aug_MoBal24
+
+From PALASH.UPGRADE_UTILISATION a 
+left join RAJENDRA.PORTFOLIO_DATA_202307 b 
+on input(a.caccserno_UPD,10.) = b.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202308 c
+on input(a.caccserno_UPD,10.) = c.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202309 d 
+on input(a.caccserno_UPD,10.) = d.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202310 e 
+on input(a.caccserno_UPD,10.) = e.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202311 f 
+on input(a.caccserno_UPD,10.) = f.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202312 g 
+on input(a.caccserno_UPD,10.) = g.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202401 h 
+on input(a.caccserno_UPD,10.) = h.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202402 i 
+on input(a.caccserno_UPD,10.) = i.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202403 j 
+on input(a.caccserno_UPD,10.) = j.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202404 k 
+on input(a.caccserno_UPD,10.) = k.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202405 l 
+on input(a.caccserno_UPD,10.) = l.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202406 m 
+on input(a.caccserno_UPD,10.) = m.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202407 n 
+on input(a.caccserno_UPD,10.) = n.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202408 o 
+on input(a.caccserno_UPD,10.) = o.caccserno;
+Quit;
+
+
+data UPGRADE_UTILISATION_2;
+set UPGRADE_UTILISATION_1;
+Month = put(datepart(create_date),yymmn6.);
+Run;
+
+
+
+Data UPGRADE_UTILISATION_3 (Keep = caccserno_UPD create_date caccserno_all mob_upd_0 mob_upd_1 mob_upd_2 mob_upd_3);
+set UPGRADE_UTILISATION_2;
+
+	 if Month = "202307" then mob_upd_0 = July_MoBal23;
+else if Month = "202308" then mob_upd_0 = Aug_MoBal23;
+else if Month = "202309" then mob_upd_0 = Sep_MoBal23;
+else if Month = "202310" then mob_upd_0 = Oct_MoBal23;
+else if Month = "202311" then mob_upd_0 = Nov_MoBal23;
+else if Month = "202312" then mob_upd_0 = Dec_MoBal23;
+else if Month = "202401" then mob_upd_0 = Jan_MoBal24;
+else if Month = "202402" then mob_upd_0 = Feb_MoBal24;
+else if Month = "202403" then mob_upd_0 = Mar_MoBal24;
+else if Month = "202404" then mob_upd_0 = Apr_MoBal24;
+else if Month = "202405" then mob_upd_0 = May_MoBal24;
+else if Month = "202406" then mob_upd_0 = Jun_MoBal24;
+else if Month = "202407" then mob_upd_0 = Jul_MoBal24;
+else if Month = "202408" then mob_upd_0 = Aug_MoBal24;
+
+	 if Month = "202307" then mob_upd_1 = Aug_MoBal23;
+else if Month = "202308" then mob_upd_1 = Sep_MoBal23;
+else if Month = "202309" then mob_upd_1 = Oct_MoBal23;
+else if Month = "202310" then mob_upd_1 = Nov_MoBal23;
+else if Month = "202311" then mob_upd_1 = Dec_MoBal23;
+else if Month = "202312" then mob_upd_1 = Jan_MoBal24;
+else if Month = "202401" then mob_upd_1 = Feb_MoBal24;
+else if Month = "202402" then mob_upd_1 = Mar_MoBal24;
+else if Month = "202403" then mob_upd_1 = Apr_MoBal24;
+else if Month = "202404" then mob_upd_1 = May_MoBal24;
+else if Month = "202405" then mob_upd_1 = Jun_MoBal24;
+else if Month = "202406" then mob_upd_1 = Jul_MoBal24;
+else if Month = "202407" then mob_upd_1 = Aug_MoBal24;
+
+	 if Month = "202307" then mob_upd_2 = Sep_MoBal23;
+else if Month = "202308" then mob_upd_2 = Oct_MoBal23;
+else if Month = "202309" then mob_upd_2 = Nov_MoBal23;
+else if Month = "202310" then mob_upd_2 = Dec_MoBal23;
+else if Month = "202311" then mob_upd_2 = Jan_MoBal24;
+else if Month = "202312" then mob_upd_2 = Feb_MoBal24;
+else if Month = "202401" then mob_upd_2 = Mar_MoBal24;
+else if Month = "202402" then mob_upd_2 = Apr_MoBal24;
+else if Month = "202403" then mob_upd_2 = May_MoBal24;
+else if Month = "202404" then mob_upd_2 = Jun_MoBal24;
+else if Month = "202405" then mob_upd_2 = Jul_MoBal24;
+else if Month = "202406" then mob_upd_2 = Aug_MoBal24;
+
+	 if Month = "202307" then mob_upd_3 = Oct_MoBal23;
+else if Month = "202308" then mob_upd_3 = Nov_MoBal23;
+else if Month = "202309" then mob_upd_3 = Dec_MoBal23;
+else if Month = "202310" then mob_upd_3 = Jan_MoBal24;
+else if Month = "202311" then mob_upd_3 = Feb_MoBal24;
+else if Month = "202312" then mob_upd_3 = Mar_MoBal24;
+else if Month = "202401" then mob_upd_3 = Apr_MoBal24;
+else if Month = "202402" then mob_upd_3 = May_MoBal24;
+else if Month = "202403" then mob_upd_3 = Jun_MoBal24;
+else if Month = "202404" then mob_upd_3 = Jul_MoBal24;
+else if Month = "202405" then mob_upd_3 = Aug_MoBal24;
+
+Run;
+
+
+
+proc sql;
+create table UPGRADE_UTILISATION_4 as 
+select distinct 
+a.*,
+x.mo_good_bal as Apr_23,
+y.mo_good_bal as May_23,
+z.mo_good_bal as Jun_23,
+b.mo_good_bal as Jul_23,
+c.mo_good_bal as Aug_23,
+d.mo_good_bal as Sep_23,
+e.mo_good_bal as Oct_23,
+f.mo_good_bal as Nov_23,
+g.mo_good_bal as Dec_23,
+h.mo_good_bal as Jan_24,
+i.mo_good_bal as Feb_24,
+j.mo_good_bal as Mar_24,
+k.mo_good_bal as Apr_24,
+l.mo_good_bal as May_24,
+m.mo_good_bal as Jun_24,
+n.mo_good_bal as Jul_24,
+o.mo_good_bal as Aug_24
+
+From UPGRADE_UTILISATION_3 a 
+left join RAJENDRA.PORTFOLIO_DATA_202304 x 
+on input(a.caccserno_all,10.) = x.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202305 y 
+on input(a.caccserno_all,10.) = y.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202306 z 
+on input(a.caccserno_all,10.) = z.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202307 b 
+on input(a.caccserno_all,10.) = b.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202308 c
+on input(a.caccserno_all,10.) = c.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202309 d 
+on input(a.caccserno_all,10.) = d.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202310 e 
+on input(a.caccserno_all,10.) = e.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202311 f 
+on input(a.caccserno_all,10.) = f.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202312 g 
+on input(a.caccserno_all,10.) = g.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202401 h 
+on input(a.caccserno_all,10.) = h.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202402 i 
+on input(a.caccserno_all,10.) = i.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202403 j 
+on input(a.caccserno_all,10.) = j.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202404 k 
+on input(a.caccserno_all,10.) = k.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202405 l 
+on input(a.caccserno_all,10.) = l.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202406 m 
+on input(a.caccserno_all,10.) = m.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202407 n 
+on input(a.caccserno_all,10.) = n.caccserno
+left join RAJENDRA.PORTFOLIO_DATA_202408 o 
+on input(a.caccserno_all,10.) = o.caccserno;
+Quit;
+
+
+data UPGRADE_UTILISATION_5;
+set UPGRADE_UTILISATION_4;
+Month = put(datepart(create_date),yymmn6.);
+Run;
+
+
+
+Data Palash.UPGRADE_UTILISATION_6 (Keep =  caccserno_UPD 
+									caccserno_all 
+									mob_upd_0 
+									mob_upd_1 
+									mob_upd_2 
+									mob_upd_3 
+									mob_Pri_Minus3 
+									mob_Pri_Minus2 
+									mob_Pri_Minus1 
+									mob_Pri_0 
+									mob_Pri_1 
+									mob_Pri_2 
+									mob_Pri_3);
+set UPGRADE_UTILISATION_5;
+
+	 if Month = "202307" then mob_Pri_Minus3 = Apr_23;
+else if Month = "202308" then mob_Pri_Minus3 = May_23;
+else if Month = "202309" then mob_Pri_Minus3 = Jun_23;
+else if Month = "202310" then mob_Pri_Minus3 = Jul_23;
+else if Month = "202311" then mob_Pri_Minus3 = Aug_23;
+else if Month = "202312" then mob_Pri_Minus3 = Sep_23;
+else if Month = "202401" then mob_Pri_Minus3 = Oct_23;
+else if Month = "202402" then mob_Pri_Minus3 = Nov_23;
+else if Month = "202403" then mob_Pri_Minus3 = Dec_23;
+else if Month = "202404" then mob_Pri_Minus3 = Jan_24;
+else if Month = "202405" then mob_Pri_Minus3 = Feb_24;
+else if Month = "202406" then mob_Pri_Minus3 = Mar_24;
+else if Month = "202407" then mob_Pri_Minus3 = Apr_24;
+else if Month = "202408" then mob_Pri_Minus3 = May_24;
+
+	 if Month = "202307" then mob_Pri_Minus2 = May_23;
+else if Month = "202308" then mob_Pri_Minus2 = Jun_23;
+else if Month = "202309" then mob_Pri_Minus2 = Jul_23;
+else if Month = "202310" then mob_Pri_Minus2 = Aug_23;
+else if Month = "202311" then mob_Pri_Minus2 = Sep_23;
+else if Month = "202312" then mob_Pri_Minus2 = OCt_23;
+else if Month = "202401" then mob_Pri_Minus2 = Nov_23;
+else if Month = "202402" then mob_Pri_Minus2 = Dec_23;
+else if Month = "202403" then mob_Pri_Minus2 = Jan_24;
+else if Month = "202404" then mob_Pri_Minus2 = Feb_24;
+else if Month = "202405" then mob_Pri_Minus2 = Mar_24;
+else if Month = "202406" then mob_Pri_Minus2 = Apr_24;
+else if Month = "202407" then mob_Pri_Minus2 = May_24;
+else if Month = "202408" then mob_Pri_Minus2 = Jun_24;
+
+	 if Month = "202307" then mob_Pri_Minus1 = Jun_23;
+else if Month = "202308" then mob_Pri_Minus1 = Jul_23;
+else if Month = "202309" then mob_Pri_Minus1 = Aug_23;
+else if Month = "202310" then mob_Pri_Minus1 = Sep_23;
+else if Month = "202311" then mob_Pri_Minus1 = Oct_23;
+else if Month = "202312" then mob_Pri_Minus1 = Nov_23;
+else if Month = "202401" then mob_Pri_Minus1 = Dec_23;
+else if Month = "202402" then mob_Pri_Minus1 = Jan_24;
+else if Month = "202403" then mob_Pri_Minus1 = Feb_24;
+else if Month = "202404" then mob_Pri_Minus1 = Mar_24;
+else if Month = "202405" then mob_Pri_Minus1 = Apr_24;
+else if Month = "202406" then mob_Pri_Minus1 = May_24;
+else if Month = "202407" then mob_Pri_Minus1 = Jun_24;
+else if Month = "202408" then mob_Pri_Minus1 = Jul_24;
+
+	 if Month = "202307" then mob_Pri_0 = Jul_23;
+else if Month = "202308" then mob_Pri_0 = Aug_23;
+else if Month = "202309" then mob_Pri_0 = Sep_23;
+else if Month = "202310" then mob_Pri_0 = Oct_23;
+else if Month = "202311" then mob_Pri_0 = Nov_23;
+else if Month = "202312" then mob_Pri_0 = Dec_23;
+else if Month = "202401" then mob_Pri_0 = Jan_24;
+else if Month = "202402" then mob_Pri_0 = Feb_24;
+else if Month = "202403" then mob_Pri_0 = Mar_24;
+else if Month = "202404" then mob_Pri_0 = Apr_24;
+else if Month = "202405" then mob_Pri_0 = May_24;
+else if Month = "202406" then mob_Pri_0 = Jun_24;
+else if Month = "202407" then mob_Pri_0 = Jul_24;
+
+	 if Month = "202307" then mob_Pri_1 = Aug_23;
+else if Month = "202308" then mob_Pri_1 = Sep_23;
+else if Month = "202309" then mob_Pri_1 = Oct_23;
+else if Month = "202310" then mob_Pri_1 = Nov_23;
+else if Month = "202311" then mob_Pri_1 = Dec_23;
+else if Month = "202312" then mob_Pri_1 = Jan_24;
+else if Month = "202401" then mob_Pri_1 = Feb_24;
+else if Month = "202402" then mob_Pri_1 = Mar_24;
+else if Month = "202403" then mob_Pri_1 = Apr_24;
+else if Month = "202404" then mob_Pri_1 = May_24;
+else if Month = "202405" then mob_Pri_1 = Jun_24;
+else if Month = "202406" then mob_Pri_1 = Jul_24;
+else if Month = "202407" then mob_Pri_1 = Aug_24;
+
+	 if Month = "202307" then mob_Pri_2 = Sep_23;
+else if Month = "202308" then mob_Pri_2 = Oct_23;
+else if Month = "202309" then mob_Pri_2 = Nov_23;
+else if Month = "202310" then mob_Pri_2 = Dec_23;
+else if Month = "202311" then mob_Pri_2 = Jan_24;
+else if Month = "202312" then mob_Pri_2 = Feb_24;
+else if Month = "202401" then mob_Pri_2 = Mar_24;
+else if Month = "202402" then mob_Pri_2 = Apr_24;
+else if Month = "202403" then mob_Pri_2 = May_24;
+else if Month = "202404" then mob_Pri_2 = Jun_24;
+else if Month = "202405" then mob_Pri_2 = Jul_24;
+else if Month = "202406" then mob_Pri_2 = Aug_24;
+
+	 if Month = "202307" then mob_Pri_3 = Oct_23;
+else if Month = "202308" then mob_Pri_3 = Nov_23;
+else if Month = "202309" then mob_Pri_3 = Dec_23;
+else if Month = "202310" then mob_Pri_3 = Jan_24;
+else if Month = "202311" then mob_Pri_3 = Feb_24;
+else if Month = "202312" then mob_Pri_3 = Mar_24;
+else if Month = "202401" then mob_Pri_3 = Apr_24;
+else if Month = "202402" then mob_Pri_3 = May_24;
+else if Month = "202403" then mob_Pri_3 = Jun_24;
+else if Month = "202404" then mob_Pri_3 = Jul_24;
+else if Month = "202405" then mob_Pri_3 = Aug_24;
+
+Run;
+
+
+
+proc sql;
+create table UPGRADE_UTILISATION_7 as 
+select distinct 
+caccserno_UPD,
+mean(mob_upd_0) as mob_upd_0, 
+mean(mob_upd_1) as mob_upd_1, 
+mean(mob_upd_2) as mob_upd_2, 
+mean(mob_upd_3) as mob_upd_3,
+mean(mob_Pri_Minus3) as mob_Pri_Minus3, 
+mean(mob_Pri_Minus2) as mob_Pri_Minus2, 
+mean(mob_Pri_Minus1) as mob_Pri_Minus1, 
+mean(mob_Pri_0) as mob_Pri_0,
+mean(mob_Pri_1) as mob_Pri_1,
+mean(mob_Pri_2) as mob_Pri_2,
+mean(mob_Pri_3) as mob_Pri_3
+
+From Palash.UPGRADE_UTILISATION_6
+group by caccserno_UPD;
+Quit;
+
+
+
