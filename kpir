@@ -1,0 +1,702 @@
+kpircar
+
+
+
+
+/*Aug23*/
+DATA aug23KPIS (KEEP=AIF_FLAG caccserno fpd_re_denom fpd_re cash_balance 
+		cyc_good_acct cyc_good_bal cyc_stmt_tad_gt_0 cyc_totalpayments1 cycledate 
+		final_balance INTOX Journey_Type__c loan_outstanding MO_dpd30_acct 
+		MO_dpd30_BAL MO_dpd90_acct MO_dpd90_BAL MO_good_acct mo_good_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal mob3_cyc_good_acct mob3_cyc_good_bal 
+		mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal mob6_cyc_good_acct mob6_cyc_good_bal 
+		mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct mob3_mo_good_bal 
+		mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct mob6_mo_good_bal 
+		New_Account OVERDUECYCLEs rev_core_delq_bal_nr REVOLVE_FLAG creditlimit 
+		cyc_overdueamount cyc_prev_mindue cyc_totalpayments pddplus1 pddplus3 
+		pure_revolver util_gt_90);
+	set CC.PORTFOLIO_DATA_202308;
+run;
+
+data xyz;
+	set aug23KPIS;
+	month=202308;
+	pddplus11=pddplus1*1;
+	pddplus31=pddplus3*1;
+	CACCSERNO1=CACCSERNO*1;
+RuN;
+
+options compress=yes;
+
+data portfolio_aug23(keep=caccserno cycledate fpd_re_denom fpd_re mo_good_bal 
+		mo_good_acct AIF_FLAG cyc_stmt_tad_gt_0 New_Account OVERDUECYCLEs 
+		creditlimit1 pddplus11 pddplus31 cyc_good_acct cyc_good_bal INTOX 
+		MO_dpd30_acct MO_dpd90_acct MO_good_acct MO_dpd30_BAL MO_dpd90_BAL 
+		MO_GOOD_BAL mob6_cyc_good_acct mob6_cyc_good_bal mob3_cyc_good_acct 
+		mob3_cyc_good_bal mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct 
+		mob3_mo_good_bal mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct 
+		mob6_mo_good_bal bal_active_good_acct cash_balance cyc_prev_mindue1 
+		cyc_totalpayments1 REVOLVE_FLAG loan_outstanding rev_core_delq_bal_nr 
+		final_balance Journey_Type__c mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal cyc_overdueamount1 REVOLVE_FLAG month 
+		pure_revolver util_gt_90);
+	set xyz;
+	format creditlimit1 20.;
+	format bal_active_good_acct 20.;
+	FORMAT cyc_totalpayments1 20.;
+	FORMAT cyc_prev_mindue1 20.;
+	FORMAT cyc_overdueamount1 20.;
+	cyc_overdueamount1=cyc_overdueamount*1;
+	cyc_prev_mindue1=cyc_prev_mindue*1;
+	creditlimit1=creditlimit*1;
+	cyc_totalpayments1=cyc_totalpayments*1;
+
+	if mo_good_bal > 0 THEN
+		bal_active_good_acct=mo_good_acct;
+	ELSE
+		bal_active_good_acct=0;
+Run;
+
+/*Aug24*/
+DATA augKPIS (KEEP=AIF_FLAG caccserno fpd_re_denom fpd_re cash_balance 
+		cyc_good_acct cyc_good_bal cyc_stmt_tad_gt_0 cyc_totalpayments1 cycledate 
+		final_balance INTOX Journey_Type__c loan_outstanding MO_dpd30_acct 
+		MO_dpd30_BAL MO_dpd90_acct MO_dpd90_BAL MO_good_acct mo_good_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal mob3_cyc_good_acct mob3_cyc_good_bal 
+		mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal mob6_cyc_good_acct mob6_cyc_good_bal 
+		mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct mob3_mo_good_bal 
+		mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct mob6_mo_good_bal 
+		New_Account OVERDUECYCLEs rev_core_delq_bal_nr REVOLVE_FLAG creditlimit 
+		cyc_overdueamount cyc_prev_mindue cyc_totalpayments pddplus1 pddplus3 
+		pure_revolver util_gt_90);
+	set CC.PORTFOLIO_DATA_202408;
+run;
+
+data xyz;
+	set augKPIS;
+	month=202408;
+	pddplus11=pddplus1*1;
+	pddplus31=pddplus3*1;
+	CACCSERNO1=CACCSERNO*1;
+RuN;
+
+options compress=yes;
+
+data portfolio_aug(keep=caccserno cycledate fpd_re_denom fpd_re mo_good_bal 
+		mo_good_acct AIF_FLAG cyc_stmt_tad_gt_0 New_Account OVERDUECYCLEs 
+		creditlimit1 pddplus11 pddplus31 cyc_good_acct cyc_good_bal INTOX 
+		MO_dpd30_acct MO_dpd90_acct MO_good_acct MO_dpd30_BAL MO_dpd90_BAL 
+		MO_GOOD_BAL mob6_cyc_good_acct mob6_cyc_good_bal mob3_cyc_good_acct 
+		mob3_cyc_good_bal mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct 
+		mob3_mo_good_bal mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct 
+		mob6_mo_good_bal bal_active_good_acct cash_balance cyc_prev_mindue1 
+		cyc_totalpayments1 REVOLVE_FLAG loan_outstanding rev_core_delq_bal_nr 
+		final_balance Journey_Type__c mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal cyc_overdueamount1 REVOLVE_FLAG month 
+		pure_revolver util_gt_90);
+	set xyz;
+	format creditlimit1 20.;
+	format bal_active_good_acct 20.;
+	FORMAT cyc_totalpayments1 20.;
+	FORMAT cyc_prev_mindue1 20.;
+	FORMAT cyc_overdueamount1 20.;
+	cyc_overdueamount1=cyc_overdueamount*1;
+	cyc_prev_mindue1=cyc_prev_mindue*1;
+	creditlimit1=creditlimit*1;
+	cyc_totalpayments1=cyc_totalpayments*1;
+
+	if mo_good_bal > 0 THEN
+		bal_active_good_acct=mo_good_acct;
+	ELSE
+		bal_active_good_acct=0;
+Run;
+
+/*Sep23*/
+DATA sep23KPIS (KEEP=AIF_FLAG caccserno fpd_re_denom fpd_re cash_balance 
+		cyc_good_acct cyc_good_bal cyc_stmt_tad_gt_0 cyc_totalpayments1 cycledate 
+		final_balance INTOX Journey_Type__c loan_outstanding MO_dpd30_acct 
+		MO_dpd30_BAL MO_dpd90_acct MO_dpd90_BAL MO_good_acct mo_good_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal mob3_cyc_good_acct mob3_cyc_good_bal 
+		mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal mob6_cyc_good_acct mob6_cyc_good_bal 
+		mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct mob3_mo_good_bal 
+		mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct mob6_mo_good_bal 
+		New_Account OVERDUECYCLEs rev_core_delq_bal_nr REVOLVE_FLAG creditlimit 
+		cyc_overdueamount cyc_prev_mindue cyc_totalpayments pddplus1 pddplus3 
+		pure_revolver util_gt_90);
+	set CC.PORTFOLIO_DATA_202309;
+run;
+
+data xyz;
+	set sep23KPIS;
+	month=202309;
+	pddplus11=pddplus1*1;
+	pddplus31=pddplus3*1;
+	CACCSERNO1=CACCSERNO*1;
+RuN;
+
+options compress=yes;
+
+data portfolio_sep23(keep=caccserno cycledate fpd_re_denom fpd_re mo_good_bal 
+		mo_good_acct AIF_FLAG cyc_stmt_tad_gt_0 New_Account OVERDUECYCLEs 
+		creditlimit1 pddplus11 pddplus31 cyc_good_acct cyc_good_bal INTOX 
+		MO_dpd30_acct MO_dpd90_acct MO_good_acct MO_dpd30_BAL MO_dpd90_BAL 
+		MO_GOOD_BAL mob6_cyc_good_acct mob6_cyc_good_bal mob3_cyc_good_acct 
+		mob3_cyc_good_bal mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct 
+		mob3_mo_good_bal mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct 
+		mob6_mo_good_bal bal_active_good_acct cash_balance cyc_prev_mindue1 
+		cyc_totalpayments1 REVOLVE_FLAG loan_outstanding rev_core_delq_bal_nr 
+		final_balance Journey_Type__c mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal cyc_overdueamount1 REVOLVE_FLAG month 
+		pure_revolver util_gt_90);
+	set xyz;
+	format creditlimit1 20.;
+	format bal_active_good_acct 20.;
+	FORMAT cyc_totalpayments1 20.;
+	FORMAT cyc_prev_mindue1 20.;
+	FORMAT cyc_overdueamount1 20.;
+	cyc_overdueamount1=cyc_overdueamount*1;
+	cyc_prev_mindue1=cyc_prev_mindue*1;
+	creditlimit1=creditlimit*1;
+	cyc_totalpayments1=cyc_totalpayments*1;
+
+	if mo_good_bal > 0 THEN
+		bal_active_good_acct=mo_good_acct;
+	ELSE
+		bal_active_good_acct=0;
+Run;
+
+/*Jul24*/
+DATA julKPIS (KEEP=AIF_FLAG caccserno fpd_re_denom fpd_re cash_balance 
+		cyc_good_acct cyc_good_bal cyc_stmt_tad_gt_0 cyc_totalpayments1 cycledate 
+		final_balance INTOX Journey_Type__c loan_outstanding MO_dpd30_acct 
+		MO_dpd30_BAL MO_dpd90_acct MO_dpd90_BAL MO_good_acct mo_good_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal mob3_cyc_good_acct mob3_cyc_good_bal 
+		mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal mob6_cyc_good_acct mob6_cyc_good_bal 
+		mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct mob3_mo_good_bal 
+		mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct mob6_mo_good_bal 
+		New_Account OVERDUECYCLEs rev_core_delq_bal_nr REVOLVE_FLAG creditlimit 
+		cyc_overdueamount cyc_prev_mindue cyc_totalpayments pddplus1 pddplus3 
+		pure_revolver util_gt_90);
+	set CC.PORTFOLIO_DATA_202407;
+run;
+
+data xyz;
+	set julKPIS;
+	month=202407;
+	pddplus11=pddplus1*1;
+	pddplus31=pddplus3*1;
+	CACCSERNO1=CACCSERNO*1;
+RuN;
+
+options compress=yes;
+
+data portfolio_jul(keep=caccserno cycledate fpd_re_denom fpd_re mo_good_bal 
+		mo_good_acct AIF_FLAG cyc_stmt_tad_gt_0 New_Account OVERDUECYCLEs 
+		creditlimit1 pddplus11 pddplus31 cyc_good_acct cyc_good_bal INTOX 
+		MO_dpd30_acct MO_dpd90_acct MO_good_acct MO_dpd30_BAL MO_dpd90_BAL 
+		MO_GOOD_BAL mob6_cyc_good_acct mob6_cyc_good_bal mob3_cyc_good_acct 
+		mob3_cyc_good_bal mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct 
+		mob3_mo_good_bal mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct 
+		mob6_mo_good_bal bal_active_good_acct cash_balance cyc_prev_mindue1 
+		cyc_totalpayments1 REVOLVE_FLAG loan_outstanding rev_core_delq_bal_nr 
+		final_balance Journey_Type__c mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal cyc_overdueamount1 REVOLVE_FLAG month 
+		pure_revolver util_gt_90);
+	set xyz;
+	format creditlimit1 20.;
+	format bal_active_good_acct 20.;
+	FORMAT cyc_totalpayments1 20.;
+	FORMAT cyc_prev_mindue1 20.;
+	FORMAT cyc_overdueamount1 20.;
+	cyc_overdueamount1=cyc_overdueamount*1;
+	cyc_prev_mindue1=cyc_prev_mindue*1;
+	creditlimit1=creditlimit*1;
+	cyc_totalpayments1=cyc_totalpayments*1;
+
+	if mo_good_bal > 0 THEN
+		bal_active_good_acct=mo_good_acct;
+	ELSE
+		bal_active_good_acct=0;
+Run;
+
+/*Jun24*/
+DATA junKPIS (KEEP=AIF_FLAG caccserno fpd_re_denom fpd_re cash_balance 
+		cyc_good_acct cyc_good_bal cyc_stmt_tad_gt_0 cyc_totalpayments1 cycledate 
+		final_balance INTOX Journey_Type__c loan_outstanding MO_dpd30_acct 
+		MO_dpd30_BAL MO_dpd90_acct MO_dpd90_BAL MO_good_acct mo_good_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal mob3_cyc_good_acct mob3_cyc_good_bal 
+		mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal mob6_cyc_good_acct mob6_cyc_good_bal 
+		mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct mob3_mo_good_bal 
+		mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct mob6_mo_good_bal 
+		New_Account OVERDUECYCLEs rev_core_delq_bal_nr REVOLVE_FLAG creditlimit 
+		cyc_overdueamount cyc_prev_mindue cyc_totalpayments pddplus1 pddplus3 
+		pure_revolver util_gt_90);
+	set CC.PORTFOLIO_DATA_202406;
+run;
+
+data xyz;
+	set junKPIS;
+	month=202406;
+	pddplus11=pddplus1*1;
+	pddplus31=pddplus3*1;
+	CACCSERNO1=CACCSERNO*1;
+RuN;
+
+options compress=yes;
+
+data portfolio_jun(keep=caccserno cycledate fpd_re_denom fpd_re mo_good_bal 
+		mo_good_acct AIF_FLAG cyc_stmt_tad_gt_0 New_Account OVERDUECYCLEs 
+		creditlimit1 pddplus11 pddplus31 cyc_good_acct cyc_good_bal INTOX 
+		MO_dpd30_acct MO_dpd90_acct MO_good_acct MO_dpd30_BAL MO_dpd90_BAL 
+		MO_GOOD_BAL mob6_cyc_good_acct mob6_cyc_good_bal mob3_cyc_good_acct 
+		mob3_cyc_good_bal mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct 
+		mob3_mo_good_bal mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct 
+		mob6_mo_good_bal bal_active_good_acct cash_balance cyc_prev_mindue1 
+		cyc_totalpayments1 REVOLVE_FLAG loan_outstanding rev_core_delq_bal_nr 
+		final_balance Journey_Type__c mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal cyc_overdueamount1 REVOLVE_FLAG month 
+		pure_revolver util_gt_90);
+	set xyz;
+	format creditlimit1 20.;
+	format bal_active_good_acct 20.;
+	FORMAT cyc_totalpayments1 20.;
+	FORMAT cyc_prev_mindue1 20.;
+	FORMAT cyc_overdueamount1 20.;
+	cyc_overdueamount1=cyc_overdueamount*1;
+	cyc_prev_mindue1=cyc_prev_mindue*1;
+	creditlimit1=creditlimit*1;
+	cyc_totalpayments1=cyc_totalpayments*1;
+
+	if mo_good_bal > 0 THEN
+		bal_active_good_acct=mo_good_acct;
+	ELSE
+		bal_active_good_acct=0;
+Run;
+
+/* May'24 KPI */
+DATA mayKPIS (KEEP=AIF_FLAG caccserno fpd_re_denom fpd_re cash_balance 
+		cyc_good_acct cyc_good_bal cyc_stmt_tad_gt_0 cyc_totalpayments1 cycledate 
+		final_balance INTOX Journey_Type__c loan_outstanding MO_dpd30_acct 
+		MO_dpd30_BAL MO_dpd90_acct MO_dpd90_BAL MO_good_acct mo_good_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal mob3_cyc_good_acct mob3_cyc_good_bal 
+		mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal mob6_cyc_good_acct mob6_cyc_good_bal 
+		mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct mob3_mo_good_bal 
+		mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct mob6_mo_good_bal 
+		New_Account OVERDUECYCLEs rev_core_delq_bal_nr REVOLVE_FLAG creditlimit 
+		cyc_overdueamount cyc_prev_mindue cyc_totalpayments pddplus1 pddplus3 
+		pure_revolver util_gt_90);
+	set CC.PORTFOLIO_DATA_202405;
+run;
+
+data xyz;
+	set mayKPIS;
+	month=202405;
+	pddplus11=pddplus1*1;
+	pddplus31=pddplus3*1;
+	CACCSERNO1=CACCSERNO*1;
+RuN;
+
+options compress=yes;
+
+data portfolio_may(keep=caccserno cycledate fpd_re_denom fpd_re mo_good_bal 
+		mo_good_acct AIF_FLAG cyc_stmt_tad_gt_0 New_Account OVERDUECYCLEs 
+		creditlimit1 pddplus11 pddplus31 cyc_good_acct cyc_good_bal INTOX 
+		MO_dpd30_acct MO_dpd90_acct MO_good_acct MO_dpd30_BAL MO_dpd90_BAL 
+		MO_GOOD_BAL mob6_cyc_good_acct mob6_cyc_good_bal mob3_cyc_good_acct 
+		mob3_cyc_good_bal mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct 
+		mob3_mo_good_bal mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct 
+		mob6_mo_good_bal bal_active_good_acct cash_balance cyc_prev_mindue1 
+		cyc_totalpayments1 REVOLVE_FLAG loan_outstanding rev_core_delq_bal_nr 
+		final_balance Journey_Type__c mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal cyc_overdueamount1 REVOLVE_FLAG month 
+		pure_revolver util_gt_90);
+	set xyz;
+	format creditlimit1 20.;
+	format bal_active_good_acct 20.;
+	FORMAT cyc_totalpayments1 20.;
+	FORMAT cyc_prev_mindue1 20.;
+	FORMAT cyc_overdueamount1 20.;
+	cyc_overdueamount1=cyc_overdueamount*1;
+	cyc_prev_mindue1=cyc_prev_mindue*1;
+	creditlimit1=creditlimit*1;
+	cyc_totalpayments1=cyc_totalpayments*1;
+
+	if mo_good_bal > 0 THEN
+		bal_active_good_acct=mo_good_acct;
+	ELSE
+		bal_active_good_acct=0;
+Run;
+
+/* Apr'24 KPI */
+DATA aprKPIS (KEEP=AIF_FLAG caccserno fpd_re_denom fpd_re cash_balance 
+		cyc_good_acct cyc_good_bal cyc_stmt_tad_gt_0 cyc_totalpayments1 cycledate 
+		final_balance INTOX Journey_Type__c loan_outstanding MO_dpd30_acct 
+		MO_dpd30_BAL MO_dpd90_acct MO_dpd90_BAL MO_good_acct mo_good_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal mob3_cyc_good_acct mob3_cyc_good_bal 
+		mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal mob6_cyc_good_acct mob6_cyc_good_bal 
+		mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct mob3_mo_good_bal 
+		mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct mob6_mo_good_bal 
+		New_Account OVERDUECYCLEs rev_core_delq_bal_nr REVOLVE_FLAG creditlimit 
+		cyc_overdueamount cyc_prev_mindue cyc_totalpayments pddplus1 pddplus3 
+		pure_revolver util_gt_90);
+	set CC.PORTFOLIO_DATA_202404;
+run;
+
+data xyz;
+	set aprKPIS;
+	month=202404;
+	pddplus11=pddplus1*1;
+	pddplus31=pddplus3*1;
+	CACCSERNO1=CACCSERNO*1;
+RuN;
+
+options compress=yes;
+
+data portfolio_apr(keep=caccserno cycledate fpd_re_denom fpd_re mo_good_bal 
+		mo_good_acct AIF_FLAG cyc_stmt_tad_gt_0 New_Account OVERDUECYCLEs 
+		creditlimit1 pddplus11 pddplus31 cyc_good_acct cyc_good_bal INTOX 
+		MO_dpd30_acct MO_dpd90_acct MO_good_acct MO_dpd30_BAL MO_dpd90_BAL 
+		MO_GOOD_BAL mob6_cyc_good_acct mob6_cyc_good_bal mob3_cyc_good_acct 
+		mob3_cyc_good_bal mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct 
+		mob3_mo_good_bal mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct 
+		mob6_mo_good_bal bal_active_good_acct cash_balance cyc_prev_mindue1 
+		cyc_totalpayments1 REVOLVE_FLAG loan_outstanding rev_core_delq_bal_nr 
+		final_balance Journey_Type__c mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal cyc_overdueamount1 REVOLVE_FLAG month 
+		pure_revolver util_gt_90);
+	set xyz;
+	format creditlimit1 20.;
+	format bal_active_good_acct 20.;
+	FORMAT cyc_totalpayments1 20.;
+	FORMAT cyc_prev_mindue1 20.;
+	FORMAT cyc_overdueamount1 20.;
+	cyc_overdueamount1=cyc_overdueamount*1;
+	cyc_prev_mindue1=cyc_prev_mindue*1;
+	creditlimit1=creditlimit*1;
+	cyc_totalpayments1=cyc_totalpayments*1;
+
+	if mo_good_bal > 0 THEN
+		bal_active_good_acct=mo_good_acct;
+	ELSE
+		bal_active_good_acct=0;
+Run;
+
+/* Sep'24 KPIS */
+DATA sepKPIS (KEEP=AIF_FLAG caccserno fpd_re_denom fpd_re cash_balance 
+		cyc_good_acct cyc_good_bal cyc_stmt_tad_gt_0 cyc_totalpayments1 cycledate 
+		final_balance INTOX Journey_Type__c loan_outstanding MO_dpd30_acct 
+		MO_dpd30_BAL MO_dpd90_acct MO_dpd90_BAL MO_good_acct mo_good_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal mob3_cyc_good_acct mob3_cyc_good_bal 
+		mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal mob6_cyc_good_acct mob6_cyc_good_bal 
+		mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct mob3_mo_good_bal 
+		mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct mob6_mo_good_bal 
+		New_Account OVERDUECYCLEs rev_core_delq_bal_nr REVOLVE_FLAG creditlimit 
+		cyc_overdueamount cyc_prev_mindue cyc_totalpayments pddplus1 pddplus3 
+		pure_revolver util_gt_90);
+	set CC.PORTFOLIO_DATA_202409;
+run;
+
+data xyz;
+	set sepKPIS;
+	month=202409;
+	pddplus11=pddplus1*1;
+	pddplus31=pddplus3*1;
+	CACCSERNO1=CACCSERNO*1;
+RuN;
+
+options compress=yes;
+
+data portfolio_sep(keep=caccserno cycledate fpd_re_denom fpd_re mo_good_bal 
+		mo_good_acct AIF_FLAG cyc_stmt_tad_gt_0 New_Account OVERDUECYCLEs 
+		creditlimit1 pddplus11 pddplus31 cyc_good_acct cyc_good_bal INTOX 
+		MO_dpd30_acct MO_dpd90_acct MO_good_acct MO_dpd30_BAL MO_dpd90_BAL 
+		MO_GOOD_BAL mob6_cyc_good_acct mob6_cyc_good_bal mob3_cyc_good_acct 
+		mob3_cyc_good_bal mob3_mo_dpd30_acct mob3_mo_dpd30_bal mob3_mo_good_acct 
+		mob3_mo_good_bal mob6_mo_dpd30_acct mob6_mo_dpd30_bal mob6_mo_good_acct 
+		mob6_mo_good_bal bal_active_good_acct cash_balance cyc_prev_mindue1 
+		cyc_totalpayments1 REVOLVE_FLAG loan_outstanding rev_core_delq_bal_nr 
+		final_balance Journey_Type__c mob6_cyc_dpd30_acct mob6_cyc_dpd30_bal 
+		mob3_cyc_dpd30_acct mob3_cyc_dpd30_bal cyc_overdueamount1 REVOLVE_FLAG month 
+		pure_revolver util_gt_90);
+	set xyz;
+	format creditlimit1 20.;
+	format bal_active_good_acct 20.;
+	FORMAT cyc_totalpayments1 20.;
+	FORMAT cyc_prev_mindue1 20.;
+	FORMAT cyc_overdueamount1 20.;
+	cyc_overdueamount1=cyc_overdueamount*1;
+	cyc_prev_mindue1=cyc_prev_mindue*1;
+	creditlimit1=creditlimit*1;
+	cyc_totalpayments1=cyc_totalpayments*1;
+
+	if mo_good_bal > 0 THEN
+		bal_active_good_acct=mo_good_acct;
+	ELSE
+		bal_active_good_acct=0;
+Run;
+
+
+
+/* proc freq data= WORK.FEBKPIS; tables intoX; */
+/* proc sql;create table sum as  */
+/* Portfolio health */
+/* selec
+
+t caccserno,month,util_gt_90,pure_revolver,revolve_flag, sum(mo_good_bal) AS TOTAL_ENR,  */
+/* SUM(mo_good_acct) AS MO_GOOD_ACT, */
+/* SUM(AIF_FLAG) AS AIF_FLAG, */
+/* SUM(CASE WHEN cyc_stmt_tad_gt_0 = 1 THEN 1 ELSE 0 END) AS STATEMENT_ACTIVE, */
+/* SUM((New_Account)) AS New_Account, */
+/* sum(CASE WHEN cyc_stmt_tad_gt_0 = 1 THEN mo_good_bal ELSE 0 END) AS active_utlization_n, */
+/* sum(case when OVERDUECYCLEs <= 6 and cyc_stmt_tad_gt_0 = 1 then creditlimit1 else 0 end) as active_utlization_d, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR, */
+/* sum(CASE WHEN aif_flag = 1 THEN creditlimit1 ELSE 0 END) AS creditlimit, */
+/*  */
+/* Delinquency metrics */
+/* SUM(CASE WHEN pddplus11 = 1 THEN mo_good_acct END) AS pddplus1_unit_nr, */
+/* SUM(CASE WHEN pddplus11 = 1 THEN cyc_good_bal END) AS pddplus1_bal_nr, */
+/* SUM(CASE WHEN pddplus31 = 1 THEN mo_good_acct END) AS pddplus3_unit_nr, */
+/* SUM(CASE WHEN pddplus31 = 1 THEN cyc_good_bal END) AS pddplus3_bal_nr, */
+/* SUM(CASE WHEN rddplus1 = 1 THEN mo_good_acct END) AS rddplus1_unit_nr, */
+/* ,ISNULL(CASE WHEN rddplus1 = 1 THEN mo_good_bal END,0) AS rddplus1_bal_nr */
+/* SUM(CASE WHEN pddplus11 in (0,1) THEN mo_good_acct END) AS pddplus1_unit_dr, */
+/* SUM(CASE WHEN pddplus11 in (0,1) THEN cyc_good_bal END) AS pddplus1_bal_dr, */
+/* SUM(CASE WHEN pddplus31 in (0,1) THEN mo_good_acct END) AS pddplus3_unit_dr, */
+/* sum(CASE WHEN pddplus31 in (0,1) THEN cyc_good_bal END) AS pddplus3_bal_dr, */
+/* SUM(CASE WHEN rddplus1 in (0,1) THEN mo_good_acct END) AS rddplus1_unit_dr, */
+/* SUM(CASE WHEN rddplus1 in (0,1) THEN mo_good_bal END,0) AS rddplus1_bal_dr */
+/* SUM(cyc_good_acct) AS cyc_good_acct , */
+/* SUM(cyc_good_bal) AS cyc_good_bal, */
+/* SUM(CASE WHEN INTOX = 1 THEN mo_good_acct ELSE 0 END) AS INTOX_UNIT_NR , */
+/* SUM(CASE WHEN INTOX = 1 and cyc_overdueamount >=10  THEN mo_good_bal ELSE 0 END) AS INTOX_BAL_NR, */
+/* sum(MO_dpd30_acct) as MO_dpd30_acct, */
+/* sum(MO_good_acct) as MO_good_acct, */
+/* sum(MO_dpd30_BAL) as MO_dpd30_Bal, */
+/* SUM(MO_GOOD_BAL) AS MO_GOOD_BAL, */
+/* sum(mob6_cyc_good_acct) as mob6cd,sum(mob6_cyc_dpd30_acct) as mob6cn, */
+/* sum(mob6_cyc_good_bal) as mob6vd,sum(mob6_cyc_dpd30_bal) as mob6vn, */
+/* sum(mob3_cyc_good_acct) as mob3cd,sum(mob3_cyc_dpd30_acct) as mob3cn, */
+/* sum(mob3_cyc_good_bal) as mob3vd,sum(mob3_cyc_dpd30_bal) as mob3vn, */
+/* sum(CASE WHEN OVERDUECYCLEs >= 2 THEN mo_good_bal ELSE 0 END) as AVG_BAD_N, */
+/* sum(CASE WHEN OVERDUECYCLEs >= 2 THEN bal_active_good_acct ELSE 0 END) AS AVG_BAD_D, */
+/* sum(CASE WHEN OVERDUECYCLEs <=0 THEN mo_good_bal ELSE 0 END) as AVG_GOOD_N, */
+/* sum(CASE WHEN OVERDUECYCLEs <=0 THEN bal_active_good_acct ELSE 0 END) AS AVG_GOOD_D, */
+/* sum((CASE WHEN OVERDUECYCLEs >= 2 THEN mo_good_bal ELSE 0 END))/SUM((CASE WHEN OVERDUECYCLEs >= 2 THEN bal_active_good_acct ELSE 0 END)) AS BAD_GOOD_RATIO_N, */
+/* sum((CASE WHEN OVERDUECYCLEs <= 0 THEN mo_good_bal ELSE 0 END))/SUM((CASE WHEN OVERDUECYCLEs <= 0 THEN bal_active_good_acct ELSE 0 END)) AS BAD_GOOD_RATIO_D, */
+/* Behavioral Metrics */
+/* sum(CASE WHEN FINAL_BALANCE > CREDITLIMIT1 THEN 1 ELSE 0 END) AS OVL_FLAG, */
+/* sum(CASE WHEN rev_core_delq_bal_nr > 0 then mo_good_acct ELSE 0 END)AS rev_core_delq_unit_nr, */
+/* sum(CASE WHEN rev_core_bal_nr > 0 then mo_good_acct ELSE 0 END) AS rev_core_unit_nr, */
+/* SUM(CASE WHEN rev_core_bal_dr > 0 THEN mo_good_acct ELSE 0 END) AS rev_core_unit_dr, */
+/* SUM(CASE WHEN (rev_core_delq_bal_nr + (loan_outstanding  * mo_good_acct)) > 0 THEN 1 ELSE 0 END) AS rev_all_unit_NR, */
+/* sum(CASE WHEN mo_good_bal > 0 THEN mo_good_acct ELSE 0 END) AS rev_all_unit_dr, */
+/* sum(rev_core_delq_bal_nr + (loan_outstanding  * mo_good_acct)) AS rev_all_bal_nr, */
+/* sum(CASE WHEN REVOLVE_FLAG = 1 THEN  ((-1*loan_outstanding ) + mo_good_bal + mo_good_acct) ELSE 0 END) AS rev_core_delq_bal_nr, */
+/* sum((((-1*loan_outstanding )*mo_good_acct) + mo_good_bal )) AS rev_core_delq_bal_dr, */
+/* sum(CASE WHEN rev_core_delq_bal_dr > 0 THEN mo_good_acct ELSE 0 END) AS rev_core_delq_unit_dr,   */
+/* SUM(CASH_CUSTOMER_ENR) AS CASH_CUSTOMER_ENR, */
+/* SUM(CASE WHEN (cyc_totalpayments1 + cyc_prev_mindue1) <= 1 AND (cyc_prev_mindue1 * -1) > 0 THEN 1 ELSE 0 END) AS Pure_revolver,  */
+/* SUM(cash_balance) AS CASH_BALANCE  */
+/* from portfolio A */
+/* where  util_gt_90=1 */
+/*  group by caccserno,month,util_gt_90,pure_revolver,revolve_flag;  */
+/* Quit; */
+data PORTFOLIO_sep231(drop=caccserno);
+	set PORTFOLIO_sep23;
+	caccserno1=caccserno*1;
+Run;
+
+data PORTFOLIO_aug231(drop=caccserno);
+	set PORTFOLIO_aug23;
+	caccserno1=caccserno*1;
+Run;
+
+data PORTFOLIO_aug1(drop=caccserno);
+	set PORTFOLIO_aug;
+	caccserno1=caccserno*1;
+Run;
+
+data PORTFOLIO_jul1(drop=caccserno);
+	set PORTFOLIO_jul;
+	caccserno1=caccserno*1;
+Run;
+
+data PORTFOLIO_jun1(drop=caccserno);
+	set PORTFOLIO_jun;
+	caccserno1=caccserno*1;
+Run;
+
+data PORTFOLIO_may1(drop=caccserno);
+	set PORTFOLIO_may;
+	caccserno1=caccserno*1;
+Run;
+
+data PORTFOLIO_apr1(drop=caccserno);
+	set PORTFOLIO_apr;
+	caccserno1=caccserno*1;
+Run;
+
+data PORTFOLIO_sep1(drop=caccserno);
+	set PORTFOLIO_sep;
+	caccserno1=caccserno*1;
+Run;
+
+DATA ALL;
+	SET PORTFOLIO_sep231 PORTFOLIO_aug231 PORTFOLIO_aug1 PORTFOLIO_jul1 
+		PORTFOLIO_jun1 PORTFOLIO_may1 PORTFOLIO_apr1 PORTFOLIO_sep1 ;
+Run;
+
+proc sql;
+	create table sum as
+	/* Portfolio health */
+	select distinct caccserno1, month, 
+sum(mo_good_bal) AS TOTAL_ENR, 
+SUM(mo_good_acct) AS MO_GOOD_ACT, 
+SUM(AIF_FLAG) AS AIF_FLAG, 
+SUM(CASE WHEN cyc_stmt_tad_gt_0=1 THEN 1 ELSE 0 END) AS STATEMENT_ACTIVE, 
+SUM((New_Account)) AS New_Account, 
+sum(CASE WHEN cyc_stmt_tad_gt_0=1 THEN mo_good_bal ELSE 0 END) AS active_utlization_n,
+sum(case when OVERDUECYCLEs <=6 and cyc_stmt_tad_gt_0=1 then creditlimit1 else 0 end) as active_utlization_d, 
+SUM(CASE WHEN OVERDUECYCLEs=0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR, 
+sum(CASE WHEN aif_flag=1 THEN creditlimit1 ELSE 0 END) AS creditlimit, 
+/* Delinquency metrics */
+SUM(CASE WHEN pddplus11=1 THEN mo_good_acct END) AS pddplus1_unit_nr, 
+SUM(CASE WHEN pddplus11=1 THEN cyc_good_bal END) AS pddplus1_bal_nr, 
+SUM(CASE WHEN pddplus31=1 THEN mo_good_acct END) AS pddplus3_unit_nr, 
+SUM(CASE WHEN pddplus31=1 THEN cyc_good_bal END) AS pddplus3_bal_nr, 
+		/* SUM(CASE WHEN rddplus1 = 1 THEN mo_good_acct END) AS rddplus1_unit_nr, */
+		/* ,ISNULL(CASE WHEN rddplus1 = 1 THEN mo_good_bal END,0) AS rddplus1_bal_nr */
+SUM(CASE WHEN pddplus11 in (0, 1) THEN mo_good_acct END) AS pddplus1_unit_dr, 
+SUM(CASE WHEN pddplus11 in (0, 1) THEN cyc_good_bal END) AS pddplus1_bal_dr, 
+SUM(CASE WHEN pddplus31 in (0, 1) THEN mo_good_acct END) AS pddplus3_unit_dr, 
+sum(CASE WHEN pddplus31 in (0, 1) THEN cyc_good_bal END) AS pddplus3_bal_dr, /* SUM(CASE WHEN rddplus1 in (0,1) THEN mo_good_acct END) AS rddplus1_unit_dr, */
+		/* SUM(CASE WHEN rddplus1 in (0,1) THEN mo_good_bal END,0) AS rddplus1_bal_dr */
+		SUM(cyc_good_acct) AS cyc_good_acct , SUM(cyc_good_bal) AS cyc_good_bal, 
+		SUM(CASE WHEN INTOX=1 THEN mo_good_acct ELSE 0 END) AS INTOX_UNIT_NR, 
+		SUM(CASE WHEN INTOX=1 THEN mo_good_bal ELSE 0 END) AS INTOX_BAL_NR, 
+		sum(MO_dpd30_acct) as MO_dpd30_acct, sum(MO_dpd90_acct) as MO_dpd90_acct, 
+		sum(MO_good_acct) as MO_good_acct, sum(MO_dpd30_BAL) as MO_dpd30_Bal, 
+		sum(MO_dpd90_BAL) as MO_dpd90_Bal, SUM(MO_GOOD_BAL) AS MO_GOOD_BAL, 
+		sum(mob6_cyc_good_acct) as mob6cd, sum(mob6_cyc_dpd30_acct) as mob6cn, 
+		sum(mob6_cyc_good_bal) as mob6vd, sum(mob6_cyc_dpd30_bal) as mob6vn, 
+		sum(mob3_cyc_good_acct) as mob3cd, sum(mob3_cyc_dpd30_acct) as mob3cn, 
+		sum(mob3_cyc_good_bal) as mob3vd, sum(mob3_cyc_dpd30_bal) as mob3vn, 
+		sum(mob6_mo_good_acct) as mobmo6cd, sum(mob6_mo_dpd30_acct) as mobmo6cn, 
+		sum(mob6_mo_good_bal) as mobmo6vd, sum(mob6_mo_dpd30_bal) as mobmo6vn, 
+		sum(mob3_mo_good_acct) as mobmo3cd, sum(mob3_mo_dpd30_acct) as mobmo3cn, 
+		sum(mob3_mo_good_bal) as mobmo3vd, sum(mob3_mo_dpd30_bal) as mobmo3vn, 
+		sum(CASE WHEN OVERDUECYCLEs >=2 THEN mo_good_bal ELSE 0 END) as AVG_BAD_N, 
+		sum(CASE WHEN OVERDUECYCLEs >=2 THEN bal_active_good_acct ELSE 0 END) AS AVG_BAD_D, 
+        sum(CASE WHEN OVERDUECYCLEs <=0 THEN mo_good_bal ELSE 0 END) as AVG_GOOD_N, 
+        sum(CASE WHEN OVERDUECYCLEs <=0 THEN bal_active_good_acct ELSE 0 END) AS AVG_GOOD_D, 
+        sum((CASE WHEN OVERDUECYCLEs >=2 THEN mo_good_bal ELSE 0 END))/SUM((CASE WHEN OVERDUECYCLEs >=2 THEN bal_active_good_acct ELSE 0 END)) AS BAD_GOOD_RATIO_N, 
+        sum((CASE WHEN OVERDUECYCLEs <=0 THEN mo_good_bal ELSE 0 END))/SUM((CASE WHEN OVERDUECYCLEs <=0 THEN bal_active_good_acct ELSE 0 END)) AS BAD_GOOD_RATIO_D, 
+        sum(fpd_re) as fpd_re,
+        sum(fpd_re_denom) as fpd_re_denom, 
+/* Behavioral Metrics */
+		sum(CASE WHEN FINAL_BALANCE > CREDITLIMIT1 THEN 1 ELSE 0 END) AS OVL_FLAG, 
+        /* sum(CASE WHEN rev_core_delq_bal_nr > 0 then mo_good_acct ELSE 0 END)AS rev_core_delq_unit_nr, */
+		/* sum(CASE WHEN rev_core_bal_nr > 0 then mo_good_acct ELSE 0 END) AS rev_core_unit_nr, */
+		/* SUM(CASE WHEN rev_core_bal_dr > 0 THEN mo_good_acct ELSE 0 END) AS rev_core_unit_dr, */
+		SUM(CASE WHEN (rev_core_delq_bal_nr + (loan_outstanding * mo_good_acct)) > 0 THEN 1 ELSE 0 END) AS rev_all_unit_NR, 
+        sum(CASE WHEN mo_good_bal > 0 THEN mo_good_acct ELSE 0 END) AS rev_all_unit_dr, 
+		sum(rev_core_delq_bal_nr + (loan_outstanding * mo_good_acct)) AS rev_all_bal_nr, 
+        sum(CASE WHEN REVOLVE_FLAG=1 THEN  ((-1*loan_outstanding) + mo_good_bal + mo_good_acct) ELSE 0 END) AS rev_core_delq_bal_nr,
+        /* sum((((-1*loan_outstanding )*mo_good_acct) + mo_good_bal )) AS rev_core_delq_bal_dr, */
+		/* sum(CASE WHEN rev_core_delq_bmoal_dr > 0 THEN mo_good_acct ELSE 0 END) AS rev_core_delq_unit_dr,  */
+		/* SUM(CASH_CUSTOMER_ENR) AS CASH_CUSTOMER_ENR, */
+		SUM(CASE WHEN (cyc_totalpayments1 + cyc_prev_mindue1) <=1 AND (cyc_prev_mindue1 * -1) > 0 THEN 1 ELSE 0 END) AS Pure_revolver_cal, 
+		SUM(cash_balance) AS CASH_BALANCE,  
+		sum(case when overduecycles <=6 then mo_good_bal else final_balance end) as nfr_bal, 
+        sum(case when overduecycles <=6 then mo_good_acct else 1 end) as nfr_acct,
+        pure_revolver, overduecycles, util_gt_90
+        from WORK.ALL
+		/* where  util_gt_90=1 */
+		group by caccserno1, month, pure_revolver, overduecycles, util_gt_90;
+Quit;
+
+Proc sql;
+	Create Table Mapping as select distinct 
+        a.*, 
+        b.accountopenmonth, 
+		b.carded_flag, 
+        b.employment_type__c as occupation_type, 
+        b.cardvariant, 
+		b.base_segment, 
+        b.journey_type__c as JourneyType,  
+		b.campaign_name__c, b.fi_Waiver, b.cpv_waiver_eligible__c 
+        from sum as a 
+        Left join PS_NEW.ACQ_MASTER_SEP24 as b 
+        on a.caccserno1=b.caccserno;
+quit;
+
+
+proc sql;
+	    create table final5 as select distinct 
+        month, accountopenmonth, 
+		JourneyType,  base_segment,
+		carded_flag,  cardvariant, occupation_type, 
+		campaign_name__c, pure_revolver, util_gt_90, overduecycles, 
+        sum(AIF_FLAG) as AIF_FLAG, 
+        sum(AVG_BAD_D) as AVG_BAD_D, 
+        sum(AVG_BAD_N) as AVG_BAD_N, 
+		sum(AVG_GOOD_D) as AVG_GOOD_D, 
+        sum(AVG_GOOD_N) as AVG_GOOD_N, 
+		sum(BAD_GOOD_RATIO_D) as BAD_GOOD_RATIO_D, 
+        sum(BAD_GOOD_RATIO_N) as BAD_GOOD_RATIO_N, 
+        sum(CASH_BALANCE) as CASH_BALANCE, 
+        sum(CURRENT_BUCKET_ENR) as CURRENT_BUCKET_ENR, 
+        sum(INTOX_BAL_NR) as INTOX_BAL_NR, 
+        sum(INTOX_UNIT_NR) as INTOX_UNIT_NR, 
+        sum(MO_GOOD_ACT) as MO_GOOD_ACT, 
+        sum(MO_GOOD_BAL) as MO_GOOD_BAL, 
+        sum(MO_dpd30_Bal) as MO_dpd30_Bal, 
+        sum(MO_dpd90_Bal) as MO_dpd90_Bal, 
+        sum(MO_dpd30_acct) as MO_dpd30_acct, 
+        sum(MO_dpd90_acct) as MO_dpd90_acct, 
+        sum(MO_good_acct) as MO_good_acct, 
+        sum(New_Account) as New_Account, 
+        sum(OVL_FLAG) as OVL_FLAG, 
+        sum(STATEMENT_ACTIVE) as STATEMENT_ACTIVE, 
+        sum(TOTAL_ENR) as TOTAL_ENR, 
+        sum(active_utlization_d) as active_utlization_d, 
+        sum(active_utlization_n) as active_utlization_n, 
+		sum(creditlimit) as creditlimit, 
+        sum(cyc_good_acct) as cyc_good_acct, 
+		sum(cyc_good_bal) as cyc_good_bal, 
+        sum(pddplus1_bal_dr) as pddplus1_bal_dr, 
+		sum(pddplus1_bal_nr) as pddplus1_bal_nr, 
+        sum(pddplus1_unit_dr) as pddplus1_unit_dr, 
+        sum(pddplus1_unit_nr) as pddplus1_unit_nr, 
+        sum(pddplus3_bal_dr) as pddplus3_bal_dr, 
+	    sum(pddplus3_bal_nr) as pddplus3_bal_nr, 
+        sum(pddplus3_unit_dr) as pddplus3_unit_dr, 
+        sum(pddplus3_unit_nr) as pddplus3_unit_nr, 
+	    sum(rev_all_bal_nr) as rev_all_bal_nr, 
+        sum(rev_all_unit_NR) as rev_all_unit_NR, 
+        sum(rev_all_unit_dr) as rev_all_unit_dr, 
+	    sum(rev_core_delq_bal_nr) as rev_core_delq_bal_nr, 
+        fi_Waiver, cpv_waiver_eligible__c, 
+        sum(mobmo3vd) as mobmo3vd, 
+        sum(mobmo3vn) as mobmo3vn, 
+	    sum(mobmo6vd) as mobmo6vd, 
+        sum(mobmo6vn) as mobmo6vn, 
+        sum(fpd_re) as fpd_re, 
+        sum(fpd_re_denom) as fpd_re_denom, 
+        sum(mobmo3cd) as mobmo3cd, 
+	    sum(mobmo3cn) as mobmo3cn, 
+        sum(mobmo6cd) as mobmo6cd, 
+        sum(mobmo6cn) as mobmo6cn, 
+        sum(nfr_bal) as nfr_bal, 
+        sum(nfr_acct) as nfr_acct
+        from mapping 
+        where base_segment in ('SA', 'Corp Sal')
+        group by 
+		accountopenmonth, 
+		JourneyType, MONTH,  
+		base_segment, carded_flag, 
+		cardvariant, occupation_type, campaign_name__c, fi_Waiver, 
+		cpv_waiver_eligible__c, pure_revolver, util_gt_90, overduecycles;
+Quit;
+
+
