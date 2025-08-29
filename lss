@@ -1,0 +1,192 @@
+options compress = yes;
+
+proc sql;
+create table JUL25 as
+	select
+		caccserno,
+		creditlimit,
+		acc_status,
+		overdueamount,
+		overduecycles,
+		final_balance,
+		loan_outstanding,
+		aif_flag,
+		product_desc,
+		sfdc_app_no,
+		journey_type__c,
+		accountopenmonth,
+		campaign_name__c,
+		base_loan_bu__c
+	from CC.PORTFOLIO_DATA_202507;
+quit;
+
+
+data data1; 
+set JUL25;
+AnlysisMonth =202507;
+run;
+
+
+
+Data Data2;
+Set CC.ACQ_MASTER_JUL25 (keep = caccserno base_segment campaign_code__c carded_flag employment_type__c risk_segment__c program_code__c);
+where not missing(caccserno);
+run;
+
+
+proc sql;
+Create Table Data3 as
+	select a.*,
+		   b.*,
+		   c.stauthorization,
+		   c.numberx
+	from Data1 as a
+	Left join Data2 as b
+	on a.caccserno =b.caccserno
+
+	Left join PS_OLD.ACCOUNTX as c
+	on a.caccserno =c.serno;
+quit;
+
+
+
+Proc sort data=Data3 nodupkey;
+by caccserno AnlysisMonth;
+run;
+
+
+options compress=yes;
+Data Data4 (drop = Principal_incl_unbill);
+Set Data3;
+format employment_type_updated $100.;
+format carded_flag_updated $100.;
+format Bucket $100.;
+format Base_Loan $100.;
+
+if overduecycles <= 0 or . then overduecycles = 0;
+else overduecycles = overduecycles;
+
+if acc_status ="AOWO" and overduecycles <= 6 then Bucket = "GCO with Block W";
+else Bucket=compress(put(overduecycles,32.));
+	
+if overduecycles in (1,2,3) and acc_status in ('D091','D121','D151') 
+then Bucket = "Ever 90 Not Normalized";
+
+else if overduecycles in (0,1,2,3) and acc_status not in ('D091','D121','D151','D181','211') and stauthorization in ('NPAR',"NPAR") 
+then Bucket = "Linked Loan NPA";
+
+
+If employment_type__c in ('SALARIED','Salaried') then employment_type_updated = "Salaried";
+else if employment_type__c in ('SELF EMPLOYED','PRO') then employment_type_updated = "Self Employed";
+else employment_type_updated = "Others";
+
+If carded_flag in  ('Multi-Carded','Single-Carded','Carded') 
+then carded_flag_updated = "Carded";
+Else carded_flag_updated = "Non Carded";
+Base_Loan = base_segment;
+
+if  journey_type__c ="NTB" then  Base_Loan = "NTB";
+if product_desc in ('FIRST Family') then Base_Loan = "Employee";
+if product_desc in ('FIRST WOW!') then Base_Loan = "Secured";
+if product_desc in ('FIRST Corporate Staff','FIRST Business','FIRST Corporate') then Base_Loan = "Corporate";
+if missing(Base_Loan) then Base_Loan = base_loan_bu__c;
+else Base_Loan = Base_Loan;
+/* Over due Grouping; Less than 1 Rs means Bk 1 */
+overdueamount =overdueamount*-1;
+Run;
+
+
+/* Mapping Settlement POS Waiver records */
+proc sql;
+create table Data5 as
+select distinct
+	a.*,
+	b.WAIVER_AMT,
+	b.month as month
+from Data4 a
+left join PS_OLD.POSWAIVER_202507 b
+on a.caccserno = b.caccserno;
+quit;
+
+
+data Data6;
+set Data5;
+if month = 202507 then Bucket = "Settlement Completed"; else Bucket = Bucket;
+if Base_Loan in ('BIL PL','BL','HL','PL','STLAP','SUV','UC','OA','LAP','AL') then Base_Loan = 'Other Asset';
+if Base_Loan in ('Corp Sal','PFM','SAL','SA') then Base_Loan = 'SA';
+if Base_Loan in ('EMP','Employee') then Base_Loan = 'Employee';
+if Base_Loan in ('SECURED','Secured') then Base_Loan = 'SECURED';
+run;
+
+
+Proc sql;
+Create Table Data7 as
+select distinct a.*,
+b.PRIME_POS_AMT as Principal_incl_unbill
+from Data6 as a
+Left join PS_OLD.POS_BAL_202507 as b
+on a.caccserno = b.caccserno;
+quit;
+
+
+proc sort data=Data7 nodupkey;
+by caccserno ;
+run;
+
+
+data Mapping1;
+set Data7;
+if not missing(WAIVER_AMT) then Principal_incl_unbill = WAIVER_AMT;
+else Principal_incl_unbill = Principal_incl_unbill;
+run;
+
+
+options compress = yes;
+Data CC.LOSS_DATA_INCREMENTAL_202507 (drop = WAIVER_AMT);
+set Mapping1;
+where anlysisMonth = 202507;
+run;
+
+
+Proc sql;
+create table CC.LOSS_DATA_PRNCBALSUMMARY_202507 as
+Select distinct
+	count(caccserno) as cust_count,
+	journey_type__c,
+	Base_Loan,
+	carded_flag_updated,
+	product_desc,
+	Bucket,
+	overduecycles,
+	accountopenmonth,
+	AnlysisMonth,
+	Sum(final_balance) as enr,
+	sum(Principal_incl_unbill) as pos
+from CC.LOSS_DATA_INCREMENTAL_202507
+group by journey_type__c,Base_Loan,carded_flag_updated,product_desc,Bucket,
+		 overduecycles,accountopenmonth,AnlysisMonth;
+Quit;
+
+
+
+/* Creating Loss Curve */
+data curve_xbase;
+set CC.LOSS_DATA_PRNCBALSUMMARY_202507;
+where anlysismonth = 202507;
+run;
+
+
+proc sql;
+create table ps_old.loss_curve_202507 as
+	select distinct
+		sum(cust_count) as cust_count,
+		overduecycles,
+		Bucket,
+		accountopenmonth,
+		AnlysisMonth,
+		sum(enr) as enr,
+		sum(pos) as pos
+	from curve_xbase
+	group by overduecycles,Bucket,accountopenmonth,AnlysisMonth;
+quit;
+
