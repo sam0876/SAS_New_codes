@@ -1,0 +1,485 @@
+import pyspark
+from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
+from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
+from pyspark.sql.window import Window
+from datetime import date, datetime, timedelta
+
+today = datetime.now()
+
+spark = (SparkSession
+    .builder
+    .appName("spyder-testing")
+    .master("yarn")
+    .config("spark.kerberos.principal",'sameer.acharya')
+    .config("spark.kerberos.keytab",'sameer.acharya.keytab')
+    .config("spark.sql.legacy.timeParserPolicy", "LEGACY")
+    .config("spark.executor.memory", "5g")
+    .config("spark.driver.memory", "5g")
+    .config("spark.executor.instances", "5")
+    .config("spark.executor.cores", "5")
+    .config("spark.driver.cores", "5")
+    .getOrCreate())
+ 
+sc = spark.sparkContext
+
+tctdbs_cinstalments = spark.read.parquet('/data/refined/creditcard/tctdbs/cinstalments/')
+tctdbs_vctransactions = spark.read.parquet('/data/refined/creditcard/tctdbs/vctransactions/')
+tctdbs_caccounts = spark.read.parquet('/data/refined/creditcard/tctdbs/caccounts/')
+tctdbs_vcardx = spark.read.parquet('/data/refined/creditcard/tctdbs/vcardx/')
+tctdbs_people = spark.read.parquet('/data/refined/creditcard/tctdbs/people/')
+tctdbs_applog = spark.read.parquet('/data/refined/creditcard/tctdbs/applog/')
+tctdbs_products = spark.read.parquet('/data/refined/creditcard/tctdbs/products/')
+
+cols_to_select = \
+['merchid', 'merchname', 'merchtype', 'outstinstamount', 'overdueamount', 'serno', 
+'caccserno', 'originalamount', 'outstprincipalamount', 'creationdate', 'instalmentsnumber', 'interestrate', 
+'status', 'trxndescription', 'instalmentplanserno']
+
+check1 = tctdbs_cinstalments.select(*cols_to_select) \
+                .withColumn("TRXNDATE", F.to_date("creationdate", "yyyy-MM-dd")) \
+                .withColumn(
+                    "instalmentplanserno", F.col("instalmentplanserno").cast('int')
+                ).withColumn(
+                    "outstinstamount", F.col("outstinstamount").cast("float")
+                )
+
+
+def get_test_report(check1, 
+                    instalmentplanserno_filter, 
+                    report_name, 
+                    blbu_new_val
+                    ):
+    report_test = check1.withColumn(
+                    "live", F.when(F.col("outstinstamount") > 0, F.lit(1)).otherwise(F.lit(0))
+                ).withColumn(
+                    report_name, F.when(F.col("instalmentplanserno").isin(instalmentplanserno_filter), F.lit(1)).otherwise(F.lit(0))
+                ).filter(
+                    (F.col(report_name) == 1) & (F.upper(F.trim(F.col("status"))).isin("NORM", "PAID"))
+                ).drop(report_name)
+
+    report_test.groupBy("TRXNDATE").count().orderBy("TRXNDATE").show()
+
+    window_spec = Window.partitionBy("serno").orderBy("TRXNDATE")
+    report_test = report_test.withColumn("row_num", F.row_number().over(window_spec)) \
+                        .filter(F.col("row_num") == 1).drop("row_num") \
+                        .withColumn("blbu_new", F.lit(blbu_new_val))
+
+    return report_test
+
+balcon_test = get_test_report(check1=check1,
+                              instalmentplanserno_filter=[482,602,604,606,608,610,612,614,616,618,762,764,766,
+                                                        936,938,940,892,890,888,886,884,882,880,878,876,874,872,870,868],
+                              report_name="Balcon",
+                              blbu_new_val="Balnc_con"
+                              )
+'''
+balcon_test.select(
+    F.countDistinct("caccserno").alias("dist"),
+    F.count("caccserno").alias("cnt"),
+    F.min("TRXNDATE").alias("txnm"),
+    F.max("TRXNDATE").alias("txmn")
+).show()
+
+balcon_test.groupBy("TRXNDATE").count().orderBy("TRXNDATE").show()
+
+balcon_test.select(
+    F.countDistinct("caccserno").alias("dist"),
+    F.count("caccserno").alias("cnt")
+).show()
+'''
+balcon_test.groupBy(F.substring("TRXNDATE",0,7)).count().show()
+
+## BT_EMI
+btemi_test = get_test_report(check1=check1,
+                              instalmentplanserno_filter=[162, 806],
+                              report_name="BT_emi",
+                              blbu_new_val="BT_emi"
+                              )
+## Trxn_EMI
+trxn_emi_test = get_test_report(check1=check1,
+                              instalmentplanserno_filter=[24,26,28,30,32,34,36,38,40,42,44,866,864,862,860,858,856,854,852,850,
+                                                          848,846,844,842,842,1002,1004,1006,1008,1010,1012],
+                              report_name="Trxn_EMI",
+                              blbu_new_val="Trxn_EMI"
+                              )
+## Merc_EMI
+merc_emi_test = get_test_report(check1=check1,
+                              instalmentplanserno_filter=[704,52,934,804,932,802,1122],
+                              report_name="Merc_EMI",
+                              blbu_new_val="Merc_EMI"
+                              )
+'''
+merc_emi_test.groupBy(["live", "Merc_EMI", "status", "TRXNDATE"]).count().orderBy("TRXNDATE").show()
+'''
+## wtl
+wtl_test = get_test_report(check1=check1,
+                            instalmentplanserno_filter=[642,644,646,648,650,652,654,656,658,660,524,562],
+                            report_name="wtl",
+                            blbu_new_val="WTL"
+                            )
+## otl
+otl_test = get_test_report(check1=check1,
+                            instalmentplanserno_filter=[962,964,966,968,970,972,974,976,978,980,982,984,986,988,990,992,994],
+                            report_name="otl",
+                            blbu_new_val="OTL"
+                            )
+
+## Emi_Tran
+emi_tran = balcon_test. \
+                unionByName(btemi_test). \
+                unionByName(trxn_emi_test). \
+                unionByName(merc_emi_test). \
+                unionByName(wtl_test). \
+                unionByName(otl_test). \
+                select(
+                    "caccserno",
+                    "originalamount",
+                    "creationdate",
+                    "TRXNDATE",
+                    "blbu_new",
+                    "live"
+                )
+emi_tran.groupBy("blbu_new").pivot("live").count().show()
+emi_tran.show()
+
+## Ever_BT
+btdata = tctdbs_vctransactions \
+    .join(tctdbs_vcardx, F.trim(tctdbs_vctransactions.cardserno) == F.trim(tctdbs_vcardx.serno), "left") \
+    .join(tctdbs_people, F.trim(tctdbs_vcardx.peopleserno) == F.trim(tctdbs_people.serno), "left") \
+    .join(tctdbs_caccounts, F.trim(tctdbs_vcardx.caccserno) == F.trim(tctdbs_caccounts.serno), "left") \
+    .filter(F.lower(F.trim(tctdbs_vctransactions.i044_reason_code)) == "btod") \
+    .select(
+        tctdbs_vctransactions['*'],
+        tctdbs_people['custidnumber'].alias('CRN'),
+        tctdbs_caccounts['numberx'].alias('AccNumber')
+    ) \
+    .withColumn("BTTEXT", F.substring(F.trim(F.col("i048_text_data")), 1, 7)) \
+    .withColumn(
+    "BT_FLAG",
+    F.when(F.trim(F.col("BTTEXT")).isin("Onecard", "Reversa"), F.lit(0)).otherwise(F.lit(1))
+    ).withColumn("TRXNDATE", F.to_date("i013_trxn_date"))
+    
+btdata.groupBy("BT_FLAG").count().show()
+
+window_spec = Window.partitionBy("serno").orderBy(F.col("TRXNDATE").desc())
+btdata = btdata.withColumn("row_num", F.row_number().over(window_spec)) \
+               .filter(F.col("row_num") == 1) \
+               .withColumn("blbu_new", F.lit("BT-Ever")).withColumn("live", F.lit(1)) \
+               .select(
+                    "serno", "caccserno", "i004_amt_trxn", "i013_trxn_date", 
+                    "TRXNDATE", "blbu_new", "live"
+                ).withColumnRenamed("i004_amt_trxn", "originalamount") \
+                .withColumnRenamed("i013_trxn_date", "creationdate") \
+                .drop("serno")
+
+btdata.groupBy("TRXNDATE").count().show()
+btdata.select("caccserno").agg(
+    F.countDistinct("caccserno").alias("cnt"),
+    F.count("caccserno").alias("cntr")
+).show()
+btdata.withColumn("amount", F.col("originalamount").cast("double")) \
+       .agg((F.sum("amount") / 10000000).alias("sum_in_crores")) \
+       .show()
+
+excluded_cacc_stgeneral = [
+    "AOWO", "BLCK", "CHOF", "CLBB", "CLCC", "CLSB", "CLSC", "CLSD", "CLSS",
+    "CRWO", "CWOF", "FATB", "FHRD", "FSFT", "MNPA", "NOAU", "NPAR", "PBIF",
+    "PCLS", "PSWC", "RTOB", "SOFR"
+]
+excluded_producttype = ["FIRST WOW!"]
+
+ 
+def get_method_log(tctdbs_applog,
+                   tctdbs_caccounts,
+                   tctdbs_products,
+                   excluded_cacc_stgeneral,
+                   excluded_producttype,
+                   method_name
+                ):    
+    if method_name == 'KOREAI':
+        username_filter = (F.trim(F.lower(F.col("username"))) == F.lit("idfcbank\\muleprimeproduat"))
+        requestorid_filter = (F.col("REQUESTORID") == 'KOREAI')
+    elif method_name == 'CognoAI':
+        username_filter = (F.trim(F.lower(F.col("username"))) == F.lit("idfcbank\\muleprimeproduat"))
+        requestorid_filter = (F.col("REQUESTORID") == 'CognoAI')
+    elif method_name == 'SFDC':
+        username_filter = (F.trim(F.lower(F.col("username"))) == F.lit("idfcbank\\muleprimeproduat"))
+        requestorid_filter = (F.col("REQUESTORID") =='SFDC')
+    elif method_name == 'SMS':
+        username_filter = (F.trim(F.lower(F.col("username"))) == F.lit("prm"))
+        requestorid_filter = (F.lit(True))
+    filtered_df = tctdbs_applog.filter(
+    (F.col("tabname") == "caccounts") &
+    (F.col("colname") == "creditlimit") &
+    (F.col("newvalue") > F.col("oldvalue")) &
+    username_filter &
+    requestorid_filter
+    )
+    raw_max_ts = filtered_df.select(F.max("DATETIMESTAMP")).collect()[0][0]
+    if raw_max_ts:
+        max_date_obj = datetime.strptime(str(raw_max_ts)[:10], "%Y-%m-%d")
+        max_month = max_date_obj.strftime("%Y-%m")  # e.g., '2025-06'
+        today_month = datetime.today().strftime("%Y-%m")
+        if max_month == today_month:
+            prev_month_date = max_date_obj - relativedelta(months=1)
+            max_month = prev_month_date.strftime("%Y-%m")
+    else:
+        max_month=None
+    print(f"max_month: {max_month}")
+    method_log = filtered_df.filter(
+    (F.substring(F.col("DATETIMESTAMP"), 1, 7) == max_month)
+    ).select("rowserno", "username", "datetimestamp", "newvalue", "oldvalue")
+    method_log.show()
+    cli_method = method_log \
+        .join(tctdbs_caccounts, F.trim(method_log.rowserno) == F.trim(tctdbs_caccounts.serno), "left") \
+        .join(tctdbs_products, F.trim(tctdbs_caccounts.product) == F.trim(tctdbs_products.serno), "left") \
+        .select(
+                method_log['*'], 
+                tctdbs_caccounts["stgeneral"], 
+                tctdbs_caccounts["product"], 
+                tctdbs_products["shortcode"], 
+                tctdbs_products["name"]
+        ).filter(
+            (F.col("oldvalue").cast("double") > 10000) &
+            (~F.col("stgeneral").isin(excluded_cacc_stgeneral)) &
+            (~F.col("name").isin(excluded_producttype)) &
+            (F.col("newvalue").cast("double") > F.col("oldvalue").cast("double"))
+        )    
+    return cli_method
+ 
+
+cli_koreai = get_method_log(tctdbs_applog,
+                   tctdbs_caccounts,
+                   tctdbs_products,
+                   excluded_cacc_stgeneral,
+                   excluded_producttype,
+                   method_name='KOREAI'
+                )
+
+cli_congoai = get_method_log(tctdbs_applog,
+                   tctdbs_caccounts,
+                   tctdbs_products,
+                   excluded_cacc_stgeneral,
+                   excluded_producttype,
+                   method_name='CognoAI'
+                )
+
+cli_sfdc = get_method_log(tctdbs_applog,
+                   tctdbs_caccounts,
+                   tctdbs_products,
+                   excluded_cacc_stgeneral,
+                   excluded_producttype,
+                   method_name='SFDC'
+                )
+
+cli_sms = get_method_log(tctdbs_applog,
+                   tctdbs_caccounts,
+                   tctdbs_products,
+                   excluded_cacc_stgeneral,
+                   excluded_producttype,
+                   method_name='SMS'
+                )
+
+cli_data = cli_koreai \
+            .unionByName(cli_congoai) \
+            .unionByName(cli_sfdc) \
+            .unionByName(cli_sms)
+            
+
+cli_data = cli_data.withColumn("TRXNDATE", F.to_date("DATETIMESTAMP")) \
+    .withColumn("caccserno", F.col("rowserno")) \
+    .withColumn("originalamount", (F.col("newvalue").cast("double") - F.col("oldvalue").cast("double"))) \
+    .withColumn("creationdate", F.col("DATETIMESTAMP")) \
+    .withColumn("blbu_new", F.lit("cli")) \
+    .withColumn("live", F.lit(1)) \
+    .select("caccserno", 
+            "originalamount", 
+            "TRXNDATE", 
+            "blbu_new", 
+            "creationdate", 
+            "live")
+            
+cli_data.show()
+
+post_acq = btdata \
+            .unionByName(cli_data) \
+            .unionByName(emi_tran)
+
+post_acq.groupBy("blbu_new", "live").count().show()
+
+last_month_last_day = (today.replace(day=1) - relativedelta(days=1))
+last_month_first_day = last_month_last_day.replace(day=1).strftime("%Y-%m-%d")
+last_month_last_day = last_month_last_day.strftime("%Y-%m-%d")
+
+post_acq = post_acq.filter(
+    (F.col("TRXNDATE").isNotNull()) &
+    (F.to_date(F.col("TRXNDATE")) >= F.to_date(F.lit(last_month_first_day))) & 
+    (F.to_date(F.col("TRXNDATE")) <= F.to_date(F.lit(last_month_last_day)))
+)
+
+post_acq.groupBy("blbu_new").count().show()
+
+post_acq.groupBy("blbu_new").agg(
+    F.count("caccserno").alias("cnt"),
+    (F.sum(F.col("originalamount").cast("double")) / 10000000).alias("orgamt"),
+    (F.sum(F.col("originalamount").cast("double")) / F.count("caccserno")).alias("avg")
+).show()
+
+
+''' here show have been striked off add again'''
+
+post_acq.groupBy(F.substring("TRXNDATE",0,7)).count().show()
+
+emi_tran.groupBy("blbu_new").count().show()
+emi_tran = emi_tran.filter(F.col("live") == 1)
+emi_tran.groupBy("blbu_new").count().show()
+
+def process_emi_type(df, emi_type):
+
+    filtered = df.filter(F.trim(F.col("blbu_new")) == emi_type)
+
+    grouped = filtered.groupBy("caccserno").agg(
+        F.min(F.to_date(F.col("TRXNDATE"))).alias("first"),
+        F.count("*").alias("count")
+    ).withColumn("MULTIPLE", (F.col("count") > 1).cast("int"))
+
+    joined = filtered.join(grouped, on=["caccserno"], how="left") \
+                     .withColumn("first_time", (F.col("first") 
+                                == F.to_date(F.col("TRXNDATE"))).cast("int")) \
+                     .withColumn("amt", F.col("originalamount").cast("double"))
+
+    return joined
+
+balcon_emi_tran2min2 = process_emi_type(emi_tran, emi_type="Balnc_con")
+wtl_emi_tran2min2 = process_emi_type(emi_tran, emi_type="WTL")
+otl_emi_tran2min2 = process_emi_type(emi_tran, emi_type="OTL")
+tran_emi_tran2min2 = process_emi_type(emi_tran, emi_type="Trxn_EMI")
+tran_emi_tran2min2 = process_emi_type(emi_tran, emi_type="Merc_EMI")
+
+emi_perf = balcon_emi_tran2min2 \
+                .unionByName(wtl_emi_tran2min2) \
+                .unionByName(otl_emi_tran2min2) \
+                .unionByName(tran_emi_tran2min2) \
+                .unionByName(tran_emi_tran2min2)
+emi_perf.show()
+
+emi_perf.groupBy(F.substring("TRXNDATE",0,7)).count().show()
+
+cc_portfolio_data = spark.read.parquet(f"/data/extract/information_mgt_team/cdw/Portfolio_cube/year=2025/month=07")
+cc_portfolio_data.show(20,False)
+
+## emi
+pf_curr = cc_portfolio_data.select(
+    F.col("caccserno").alias("caccserno1"), "overduecycles", "cyc_overduecycles", 
+    "balance", "instalmentbalance", "mo_good_bal", "cyc_good_bal"
+)
+
+emi_perf = emi_perf.join(
+    pf_curr,
+    F.trim(emi_perf["caccserno"]) == F.trim(pf_curr["caccserno1"]),
+    how="left"
+).withColumn("cur_month", F.to_date(F.lit(last_month_first_day))) \
+ .withColumn("months_diff", F.floor(F.months_between(F.col("cur_month"), F.col("first")))) \
+ .withColumn("cur_month", F.date_format(F.col("cur_month"), "MMM-yyyy"))
+
+emi_performance_final = emi_perf.groupBy("caccserno", "blbu_new").agg(
+    F.max(F.to_date(F.col("first"))).alias("first"),
+    F.max(F.col("overduecycles")).alias("overduecycles"),
+    F.max(F.col("cyc_overduecycles")).alias("cyc_overduecycles"),
+    F.max(F.col("balance").cast("double")).alias("balance"),
+    F.max(F.col("instalmentbalance")).alias("instalmentbalance"),
+    F.max(F.col("mo_good_bal")).alias("mo_good_bal"),
+    F.max(F.col("cur_month")).alias("cur_month"),
+    F.max(F.col("months_diff")).alias("months_diff")
+)
+
+emi_performance_final.show()
+
+emi_performance_final.columns
+
+emi_performance_final.groupBy(F.substring("TRXNDATE",0,7)).count().show()
+emi_performance_final.coalesce(1).write.mode('overwrite').option('header',True).csv('/data/extract/policy_files/policy/sameer.acharya/EMI_new_Performance/')
+
+cli_emi_tran=cli_data
+cli_data.columns
+cli_emi_tran = cli_emi_tran.withColumn("TRXNDATE", F.to_date(F.col("creationdate"), "yyyy-MM-dd")) \
+                           .withColumn("TRXNMNTH", F.date_format(F.col("TRXNDATE"), "MMM-yyyy")) \
+                           .withColumn("trxndate", F.to_date(F.col("creationdate"), "yyyy-MM-dd")) \
+                           .withColumn("m", F.lpad(F.month(F.col("trxndate")).cast("string"), 2, "0")) \
+                           .withColumn("y", F.year(F.col("trxndate"))) \
+                           .withColumn("trxnmnth1", F.concat_ws("", F.col("y"), F.col("m"))) \
+                           .select("caccserno", "TRXNMNTH")
+cli_emi_tran = cli_emi_tran.join(
+    pf_curr,
+    F.trim(cli_emi_tran["caccserno"]) 
+    == F.trim(pf_curr["caccserno1"]),
+    how="left"
+).select(
+    cli_emi_tran['*'],
+    pf_curr['overduecycles'],
+    pf_curr['cyc_overduecycles'],
+    pf_curr['balance'],
+    pf_curr['instalmentbalance'],
+    pf_curr['mo_good_bal'],
+)
+
+cli_emi_tran = cli_emi_tran.withColumn("cur_month", F.to_date(F.lit(last_month_first_day))) \
+    .withColumn("months_diff", F.floor(F.months_between("cur_month", "TRXNMNTH"))) \
+    .withColumn("cur_month", F.date_format("cur_month", "MMM-yyyy"))
+cli_emi_tran.columns
+
+cli_summary = cli_emi_tran.groupBy("caccserno", "TRXNMNTH").agg(
+    F.max("overduecycles").alias("overduecycles"),
+    F.max("cyc_overduecycles").alias("cyc_overduecycles"),
+    F.max(F.col("balance").cast("double")).alias("balance"),
+    F.max("instalmentbalance").alias("instalmentbalance"),
+    F.max("mo_good_bal").alias("mo_good_bal"),
+    F.max("cur_month").alias("cur_month"),
+    F.max("months_diff").alias("months_diff")
+)
+cli_summary.columns
+cli_summary.groupBy(F.substring("TRXNDATE",0,7)).count().show()
+cli_summary.coalesce(1).write.mode('overwrite').option('header',True).csv('/data/extract/policy_files/policy/sameer.acharya/CLI_new_Performance/')
+
+
+## BT_Ever
+bt_tran = btdata.withColumn("TRXNDATE", F.to_date("TRXNDATE", "yyyy-MM-dd"))
+btdata.columns
+bt_first = bt_tran.groupBy("caccserno").agg(
+    F.min("TRXNDATE").alias("first"),
+    F.count("*").alias("count")
+).withColumn("MULTIPLE", F.when(F.col("count") > 1, 1).otherwise(0))
+
+bt_tran = bt_tran.join(bt_first, on="caccserno", how="left") \
+    .withColumn("first_time", F.when(F.col("TRXNDATE") == F.col("first"), 1).otherwise(0)) \
+    .withColumn("amt", F.col("originalamount").cast("double"))
+
+bt_tran = bt_tran.join(
+    pf_curr,
+    bt_tran["caccserno"] == pf_curr["caccserno1"],
+    how="left"
+)
+
+bt_tran = bt_tran.withColumn("cur_month", F.to_date(F.lit(last_month_first_day))) \
+    .withColumn("months_diff", F.floor(F.months_between("cur_month", "TRXNDATE"))) \
+    .withColumn("cur_month", F.date_format("cur_month", "MMM-yyyy"))
+
+bt_tran = bt_tran.withColumn("TRXNMNTH", F.date_format("TRXNDATE", "MMM-yyyy"))
+bt_tran.columns
+bt_summary = bt_tran.groupBy("caccserno", "TRXNMNTH").agg(
+    F.max("overduecycles").alias("overduecycles"),
+    F.max("cyc_overduecycles").alias("cyc_overduecycles"),
+    F.max(F.col("balance").cast("double")).alias("balance"),
+    F.max("instalmentbalance").alias("instalmentbalance"),
+    F.max("mo_good_bal").alias("mo_good_bal"),
+    F.max("cur_month").alias("cur_month"),
+    F.max("months_diff").alias("months_diff")
+)
+
+bt_summary.show()
+bt_summary.groupBy(F.substring("TRXNDATE",0,7)).count().show()
+bt_summary.coalesce(1).write.mode('overwrite').option('header',True).csv('/data/extract/policy_files/policy/sameer.acharya/BT_new1_Performance/')
+
+spark.stop()
