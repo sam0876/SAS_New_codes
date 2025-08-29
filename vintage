@@ -1,0 +1,2370 @@
+Vintage python-----------------------------------------
+
+import pyspark
+from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
+from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
+from pyspark.sql.window import Window
+
+
+today = datetime.now()
+print(today)
+
+spark = SparkSession.builder.appName(f'Vintages_{today}').getOrCreate()
+required_day=today - relativedelta(months=3)
+this_year = str(required_day.year)
+this_month = str(required_day.month)
+if len(this_month) == 1:
+    this_month = '0' + this_month
+this_year_month = int(this_year + this_month)
+print(this_year_month)
+#years_del = 2 ## CHANGE THIS TO TWO YEARS
+#past_date = today - relativedelta(years=years_del)
+past_date = today - relativedelta(months=8)
+past_year = str(past_date.year)
+past_month = str(past_date.month)
+if len(past_month) == 1:
+    past_month = '0' + past_month
+past_year_month = int(past_year + past_month)
+
+def generate_monthly_summary(df, month_code):
+    
+    df = df.withColumnRenamed("ext_sfdc_app_id", "sfdc_app_no")
+    
+    df = df.withColumn("overduecycles", F.col("overduecycles").cast("double")) \
+           .withColumn("mo_good_acct", F.col("mo_good_acct").cast("double")) \
+           .withColumn("mo_dpd30_bal", F.col("mo_dpd30_bal").cast("double")) \
+           .withColumn("mo_good_bal", F.col("mo_good_bal").cast("double")) \
+           .withColumn("cyc_dpd30_re", F.col("cyc_dpd30_re").cast("double")) \
+           .withColumn("cyc_good_bal", F.col("cyc_good_bal").cast("double")) \
+           .withColumn("fpd_re", F.col("fpd_re").cast("double")) \
+           .withColumn("fpd_re_denom", F.col("fpd_re_denom").cast("double")) \
+           .withColumn("spd_re", F.col("spd_re").cast("double")) \
+           .withColumn("spd_re_denom", F.col("spd_re_denom").cast("double")) \
+           .withColumn("tpd_re", F.col("tpd_re").cast("double")) \
+           .withColumn("tpd_re_denom", F.col("tpd_re_denom").cast("double")) \
+           .withColumn("pddplus1", F.col("pddplus1").cast("int")) \
+           .withColumn("pddplus3", F.col("pddplus3").cast("int"))
+        
+    return df.groupBy("caccserno", "journey_type__c", "mob", "sfdc_app_no", "product_desc").agg(
+        F.lit(month_code).alias("month"),
+        F.sum(F.when(F.col("overduecycles") == 0, F.col("mo_good_acct"))).alias("CURRENT_BUCKET"),
+        F.sum(F.when(F.col("overduecycles") == 0, F.col("mo_good_bal"))).alias("CURRENT_BUCKET_ENR"),
+        F.sum("mo_good_acct").alias("MO_GOOD_ACT"),
+        F.sum("mo_dpd30_bal").alias("mo_dpd30_bal"),
+        F.sum("mo_good_bal").alias("MO_GOOD_BAL"),
+        F.sum("cyc_dpd30_re").alias("cyc_dpd30_bal"),
+        F.sum("cyc_good_bal").alias("cyc_good_bal"),
+        F.sum(F.when(F.col("overduecycles") >= 2, F.col("mo_good_acct"))).alias("COINCIDENTAL_30"),
+        F.sum(F.when(F.col("overduecycles") >= 4, F.col("mo_good_acct"))).alias("COINCIDENTAL_90"),
+        F.sum(F.when(F.col("overduecycles") >= 1, F.col("mo_good_bal"))).alias("Coincidental_1_ENR"),
+        F.sum(F.when(F.col("overduecycles") >= 2, F.col("mo_good_bal"))).alias("Coincidental_30_ENR"),
+        F.sum(F.when(F.col("overduecycles") >= 4, F.col("mo_good_bal"))).alias("Coincidental_90_ENR"),
+        F.sum("fpd_re").alias("fpd_re"),
+        F.sum("fpd_re_denom").alias("fpd_re_denom"),
+        F.sum("spd_re").alias("spd_re"),
+        F.sum("spd_re_denom").alias("spd_re_denom"),
+        F.sum("tpd_re").alias("tpd_re"),
+        F.sum("tpd_re_denom").alias("tpd_re_denom"),
+        F.sum(F.when(F.col("pddplus1") == 1, F.col("cyc_good_bal"))).alias("pdd_nr"),
+        F.sum(F.when(F.col("pddplus1").isin(0, 1), F.col("cyc_good_bal"))).alias("pdd_dr"),
+        F.sum(F.when(F.col("pddplus3") == 1, F.col("cyc_good_bal"))).alias("rdd_nr"),
+        F.sum(F.when(F.col("pddplus3").isin(0, 1), F.col("cyc_good_bal"))).alias("rdd_dr")
+    )
+
+year_month = past_year_month
+print(year_month, '\n')
+while_limit = 1000
+epoch = 0
+
+
+
+all_summaries = []
+while (year_month < this_year_month and epoch < while_limit):
+     # f'RAJENDRA.PORTFOLIO_DATA_{year_month}'
+    portfolio_data_curr = spark.read.parquet(f"/user/krishna.gudur_int/obop3/CC_PORTFOLIO_DATA_{year_month}")
+    monthly_summary = generate_monthly_summary(portfolio_data_curr, year_month)
+    all_summaries.append(monthly_summary)
+    print(year_month)
+    
+    if int(str(year_month)[-2:]) < 12:
+        year_month = year_month + 1
+    else:
+        year_month = year_month - int(str(year_month)[-2:]) + 1
+        year_month = year_month + 100
+    epoch += 1
+
+all_files = all_summaries[0]
+for i in range(1, len(all_summaries)):
+    all_files = all_files.unionByName(all_summaries[i])
+
+acq_master_curr = spark.read.parquet('/user/krishna.gudur_int/obop3/ACQ_MASTER_APR25') #last_month for this month
+ifb_application__c = spark.read.parquet('/data/refined/sfdc/creditcard/ifb_application__c/')
+
+data = all_files.join(
+    acq_master_curr,
+    on=["caccserno"],
+    how="left"
+).select(
+    all_files["*"],
+    acq_master_curr["Base_Loan_Business_Unit"],
+    acq_master_curr["accountopenmonth"],
+    acq_master_curr["carded_flag"],
+    acq_master_curr["campaign_name__c"],
+    acq_master_curr["risk_segment__C"],
+    acq_master_curr["base_segment"]
+)
+
+creditcard_df = ifb_application__c.select(
+    F.col("name").alias("name"),
+    F.col("createddate").alias("createddate"),
+    "utm_source__c",
+    "utm_medium__c"
+)
+
+partner_df = creditcard_df.withColumn("partner", F.when(~F.col("utm_source__c").isin("Partner"), "Not Partners")
+    .otherwise(F.col("utm_medium__c")))
+
+partner_keywords = {
+    "AKIKO": "AKIKO", "Affiliate": "Affiliate", "Affnadsutm_campaign": "Affnadsutm_campaign",
+    "MyGlamm": "MyGlamm", "AM_TECH_VENTURES": "AM_TECH_VENTURES", "Antworks": "Antworks",
+    "BANK_BDL": "BANK_BDL", "BANK_BUDDY_LOAN": "BANK_BUDDY_LOAN", "BankSat": "BankSathi",
+    "BFDL": "BFDL", "CREDILIO": "CREDILIO_FINANCIAL", "CREDIT_KARO": "CREDIT_KARO",
+    "XVRK": "XVRK", "ZET": "ZET", "prudent": "prudent", "reculta": "reculta", "roinet": "roinet",
+    "TransUnion": "TransUnion", "SriBalaji": "SriBalaji", "SquareFin": "SquareFin",
+    "Spectrum_digital": "Spectrum_digital", "CHAHAL": "CHAHAL", "Cards Hub": "Cards Hub",
+    "CashKaro": "Cash Karo", "CreditMantri": "Credit Mantri", "Fampay": "Fampay",
+    "IndiaLends": "India Lends", "MMM": "MMM", "Mobisafar": "Mobisafar", "ONECODE": "ONECODE",
+    "Oolka": "Oolka", "PB": "PaisaBazaar", "PaisaBazaar": "PaisaBazaar", "PB_EARN": "PaisaBazaar_EARN",
+    "Paytm": "Paytm", "Pratithi": "Pratithi", "Prtithi": "Pratithi", "Q-Get_Financial_Tech": "Q-Get_Financial_Tech",
+    "Q_GET_FINANCIAL_TECH": "Q-Get_Financial_Tech", "RAAJ_KHOSLA": "RAAJ_KHOSLA", "eazycredit": "eazycredit",
+    "netambit": "netambit", "tfp": "tfp"
+}
+
+for keyword, label in partner_keywords.items():
+    partner_df = partner_df.withColumn(
+        "partner",
+        F.when(F.lower(F.col("utm_medium__c")).contains(keyword.lower()), F.lit(label)).otherwise(F.col("partner"))
+    )
+
+partner_list = [
+    "AKIKO", "AM_TECH_VENTURES", "Antworks", "BANK_BDL", "BFDL", "BankSathi", "CREDILIO_FINANCIAL",
+    "CREDIT_KARO", "Cards Hub", "Cash Karo", "Credit Mantri", "Fampay", "India Lends", "MMM",
+    "Mobisafar", "ONECODE", "Oolka", "PaisaBazaar", "PaisaBazaar_EARN", "Paytm", "Pratithi",
+    "Q-Get_Financial_Tech", "RAAJ_KHOSLA", "eazycredit", "netambit", "tfp"
+]
+
+partners_dump = partner_df.filter(
+    (F.col("utm_source__c") == "Partner") & (F.col("partner").isin(partner_list))
+)
+
+data1 = data.join(
+    partners_dump,
+    F.trim(data.sfdc_app_no) == F.trim(partners_dump.name),
+    how="left"
+).select(
+    data['*'], 
+    partners_dump["utm_source__c"],
+    partners_dump["partner"]
+).distinct()
+
+vintage = data1.groupBy(
+    "base_segment", "accountopenmonth", "carded_flag", "journey_type__c", "mob",
+    "partner", "product_desc", "month", "campaign_name__c", "risk_segment__C"
+).agg(
+    F.countDistinct("caccserno").alias("customers"),
+    F.sum("CURRENT_BUCKET").alias("CURRENT_BUCKET"),
+    F.sum("CURRENT_BUCKET_ENR").alias("CURRENT_BUCKET_ENR"),
+    F.sum("MO_GOOD_ACT").alias("MO_GOOD_ACT"),
+    F.sum("mo_good_bal").alias("mo_good_bal"),
+    F.sum("mo_dpd30_bal").alias("mo_dpd30_bal"),
+    F.sum("cyc_good_bal").alias("cyc_good_bal"),
+    F.sum("cyc_dpd30_bal").alias("cyc_dpd30_bal"),
+    F.sum("COINCIDENTAL_30").alias("COINCIDENTAL_30"),
+    F.sum("COINCIDENTAL_90").alias("COINCIDENTAL_90"),
+    F.sum("Coincidental_1_ENR").alias("Coincidental_1_ENR"),
+    F.sum("Coincidental_30_ENR").alias("Coincidental_30_ENR"),
+    F.sum("Coincidental_90_ENR").alias("Coincidental_90_ENR"),
+    F.sum("pdd_nr").alias("pdd_nr"),
+    F.sum("pdd_dr").alias("pdd_dr"),
+    F.sum("rdd_nr").alias("rdd_nr"),
+    F.sum("rdd_dr").alias("rdd_dr")
+)
+
+vintage.show()
+
+vintage.coalesce(1).write.mode('overwrite').option('header',True).csv('/data/extract/policy_files/policy/sachin.garg/Vintage/')
+
+acq_master_prev = spark.read.parquet('/user/krishna.gudur_int/obop3/ACQ_MASTER_MAR25') # PS_NEW.ACQ_MASTER_FEB25 (last to the last month)
+acq_master_prev.filter(
+    (F.col("base_Segment").isin("SA", "Corp Sal")) &
+    (F.upper(F.col("campaign_name__c")).isin("ETB_PA", "ETB_PA_PA_", "ETB_PQ", "ETB_PA_PQ_")) &
+    (F.col("journey_type__c") == "ETB As Is") &
+    (~F.col("cardvariant").isin("FIRST WOW!", "FIRST Business", "FIRST Corporate", "FIRST Corporate Staff"))
+).groupBy("carded_flag", "accountopenmonth") \
+ .agg(F.count("caccserno").alias("count")) \
+ .show()
+
+
+vintage---SAS-----------
+
+/* 							April 2025						*/
+
+proc sql;
+create table APR25 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202504 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202504
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+		sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+
+
+/* 							March 2025						*/
+
+proc sql;
+create table MAR25 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202503 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202503
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+		sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+
+/* 							February 2025						*/
+
+proc sql;
+create table FEB25 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202502 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202502
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+		sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+
+/* 							JANUARY 2025						*/
+
+proc sql;
+create table JAN25 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202501 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202501
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+		sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+
+
+/* 							DECEMBER 2024 						*/
+
+proc sql;
+create table DEC24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202412 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202412
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+		sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+/* 							NOVEMBER 2024 						*/
+
+proc sql;
+create table NOV24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202411 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202411
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+		sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+/* 							OCTOBER 2024 						*/
+
+proc sql;
+create table OCT24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202410 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202410
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+		sfdc_app_no, 
+			product_desc;
+Quit;
+
+/* 							SEPTEMBER 2024 						*/
+
+proc sql;
+create table SEP24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202409 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202409
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+			sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+/* 							AUGUST 2024 						*/
+
+proc sql;
+create table AUG24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202408 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+from RAJENDRA.PORTFOLIO_DATA_202408
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+			sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+
+/* 							JULY 2024 						*/
+
+proc sql;
+create table JUL24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202407 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202407
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+			sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+/* 							JUNE 2024 						*/
+
+proc sql;
+create table JUN24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202406 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202406
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+			sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+
+/* 							MAY 2024 						*/
+
+proc sql;
+create table MAY24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202405 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202405
+group by 	caccserno, 
+			journey_type__c, 
+			mob,
+			sfdc_app_no, 
+			product_desc;
+Quit;
+
+
+
+/* 							APRIL 2024 						*/
+
+proc sql;
+create table APR24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202404 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202404
+group by caccserno, 
+		journey_type__c, 
+		mob,
+		sfdc_app_no, 
+		product_desc;
+Quit;
+
+
+
+/* 							MARCH 2024 						*/
+
+proc sql;
+create table MAR24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202403 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202403
+group by caccserno, 
+		journey_type__c, 
+		mob,
+		sfdc_app_no, 
+		product_desc;
+Quit;
+
+
+/* 							FEBRUARY 2024 						*/
+
+proc sql;
+create table FEB24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202402 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202402
+group by caccserno, 
+		journey_type__c, 
+		mob, 
+		sfdc_app_no,		
+		product_desc;
+Quit;
+
+/* 							JANUARY 2024 						*/
+
+proc sql;
+create table JAN24 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202401 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202401
+group by caccserno, 
+		journey_type__c, 
+		mob, 
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+
+/* 							December 2023 						*/
+
+proc sql;
+create table Dec23 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202312 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.PORTFOLIO_DATA_202312
+group by caccserno, 
+		journey_type__c, 
+		mob, 
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							November 2023 						*/
+
+proc sql;
+create table Nov23 as 
+select caccserno,	
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		202311 as month,	
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202311
+group by caccserno, 
+		journey_type__c, 
+		mob, 
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+
+/* 							October 2023 						*/
+
+proc sql;
+create table oct23 as 
+select caccserno,	journey_type__c,	mob,
+		202310 as month,	product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202310
+group by caccserno, 
+		journey_type__c, 
+		mob, 
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							September 2023 						*/
+
+proc sql;
+create table sep23 as 
+select caccserno,journey_type__c,mob,
+		202309 as month,product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from 	RAJENDRA.portfolio_data_202309
+group by caccserno, 
+		journey_type__c, 
+		mob, 
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							August 2023 						*/
+
+proc sql;
+create table aug23 as 
+select caccserno, 
+		journey_type__c, 
+		mob,
+		sfdc_app_no,
+		202308 as month, 
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from 	RAJENDRA.portfolio_data_202308
+group by caccserno, 
+		journey_type__c, 
+		mob,
+		sfdc_app_no, 
+		product_desc;
+Quit;
+
+
+/* 							July 2023 						*/
+
+proc sql;
+create table jul23 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		202307 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from 	RAJENDRA.portfolio_data_202307
+group by caccserno, 
+		journey_type__c, 
+		mob, 
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							June 2023 						*/
+
+proc sql;
+create table jun23 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		202306 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from 	RAJENDRA.PORTFOLIO_DATA_202306
+group by caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							May 2023 						*/
+
+proc sql;
+create table may23 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		202305 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from 	RAJENDRA.PORTFOLIO_DATA_202305
+group by caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							April 2023 						*/
+
+proc sql;
+create table apr23 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		202304 as month,product_desc,
+		SUM(CASE WHEN overduecycles = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN overduecycles = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+/* Someone has ruined portfolio data in madhuri library so we will have to read it from AWS Directly. */
+from 	RAJENDRA.portfolio_data_202304
+group by caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+/* 							March 2023 						*/
+
+proc sql;
+create table mar23 as 
+select caccserno, 
+		journey_type__c, 
+		mob,
+		sfdc_app_no,
+		202303 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from	 RAJENDRA.portfolio_data_202303
+group by caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							February 2023 						*/
+
+proc sql;
+create table feb23 as 
+select  caccserno, 
+		journey_type__c, 
+		mob,
+		sfdc_app_no,
+		202302 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR
+		,sum(fpd_re) as fpd_re
+		,sum(fpd_re_denom) as fpd_re_denom
+		,sum(spd_re) as spd_re
+		,sum(spd_re_denom) as spd_re_denom
+		,sum(tpd_re) as tpd_re
+		,sum(tpd_re_denom) as tpd_re_denom,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202302
+group by caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							January 2023 						*/
+
+proc sql;
+create table jan23 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		202301 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202301
+group by caccserno,
+		journey_type__c,	
+		mob,
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+/* 							December 2022 						*/
+
+proc sql;
+create table dec22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		202212 as month,product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202212
+group by caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+/* 							November 2022 						*/
+
+proc sql;
+create table nov22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		202211 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202211
+group by caccserno,
+		journey_type__c,
+		mob,
+		sfdc_app_no,
+		product_desc;
+Quit;
+
+
+/* 							October 2022 						*/
+
+
+proc sql;
+create table oct22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		202210 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from Rajendra.PORTFOLIO_DATA_202210
+group by caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		product_desc;
+Quit;
+
+
+/* 							September 2022 						*/
+
+
+proc sql;
+create table sep22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		202209 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202209
+group by caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		product_desc;
+Quit;
+
+
+/* 							August 2022 						*/
+
+
+proc sql;
+create table aug22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		202208 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202208
+group by caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		product_desc;
+Quit;
+
+
+/* 							July 2022 						*/
+
+
+proc sql;
+create table jul22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		202207 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202207
+group by caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		product_desc;
+Quit;
+
+
+/* 							June 2022 						*/
+
+
+proc sql;
+create table jun22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		202206 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr 
+
+from RAJENDRA.portfolio_data_202206
+group by caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		product_desc;
+Quit;
+
+
+/* 							MAY 2022 						*/
+
+
+proc sql;create table may22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		202205 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202205
+group by caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		product_desc;
+Quit;
+
+
+/* 							APRIL 2022 						*/
+
+
+proc sql;create table apr22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		202204 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202204
+group by caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		product_desc;
+Quit;
+
+
+/* 							MARCH 2022 						*/
+
+
+proc sql;
+create table mar22 as 
+select caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		202203 as month,
+		product_desc,
+		SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET
+		,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR
+		,SUM(mo_good_acct) AS MO_GOOD_ACT
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(mo_good_bal) AS MO_GOOD_BAL
+		,SUM(cyc_dpd30_re) as cyc_dpd30_bal
+		,SUM(cyc_good_bal) as cyc_good_bal
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90
+		,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR
+		,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR
+		,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR,
+		SUM(CASE WHEN pddplus1 = 1 THEN cyc_good_bal END) as pdd_nr,
+		SUM(CASE WHEN pddplus1 in (0,1) THEN cyc_good_bal END) as pdd_dr,
+		SUM(CASE WHEN pddplus3 = 1 THEN cyc_good_bal END) as rdd_nr,
+		SUM(CASE WHEN pddplus3 in (0,1) THEN cyc_good_bal END) as rdd_dr
+
+from RAJENDRA.portfolio_data_202203
+group by caccserno,
+		journey_type__c,
+		mob,
+		ext_sfdc_app_id,
+		product_desc;
+Quit;
+
+/* FEB 2022 */
+
+/* proc sql;
+create table feb22 as select caccserno,journey_type__c,mob, */
+/* 202202 as month,product_desc, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET */
+/* ,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR */
+/* ,SUM(mo_good_acct) AS MO_GOOD_ACT */
+/* ,SUM(mo_dpd30_bal) AS mo_dpd30_bal */
+/* ,SUM(mo_good_bal) AS MO_GOOD_BAL */
+/* ,SUM(cyc_dpd30_re) as cyc_dpd30_bal */
+/* ,SUM(cyc_good_bal) as cyc_good_bal */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30 */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90 */
+/* ,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR */
+/* from portfolio_data_202202 */
+/* group by caccserno,journey_type__c,mob,product_desc; */
+/* Quit; */
+
+/* JAN 2022 */
+
+/* proc sql;create table jan22 as select caccserno,journey_type__c,mob, */
+/* 202201 as month,product_desc, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET */
+/* ,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR */
+/* ,SUM(mo_good_acct) AS MO_GOOD_ACT */
+/* ,SUM(mo_dpd30_bal) AS mo_dpd30_bal */
+/* ,SUM(mo_good_bal) AS MO_GOOD_BAL */
+/* ,SUM(cyc_dpd30_re) as cyc_dpd30_bal */
+/* ,SUM(cyc_good_bal) as cyc_good_bal */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30 */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90 */
+/* ,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR */
+/* from portfolio_data_202201 */
+/* group by caccserno,journey_type__c,mob,product_desc; */
+/* Quit; */
+
+/* proc sql;create table dec21 as select caccserno,journey_type__c,mob, */
+/* 202112 as month,product_desc, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET */
+/* ,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR */
+/* ,SUM(mo_good_acct) AS MO_GOOD_ACT */
+/* ,SUM(mo_dpd30_bal) AS mo_dpd30_bal */
+/* ,SUM(mo_good_bal) AS MO_GOOD_BAL */
+/* ,SUM(cyc_dpd30_re) as cyc_dpd30_bal */
+/* ,SUM(cyc_good_bal) as cyc_good_bal */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30 */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90 */
+/* ,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR */
+/* from Madhuri.portfolio_data_202112 */
+/* group by caccserno,journey_type__c,mob,product_desc; */
+/* Quit; */
+/*  */
+/* proc sql;create table nov21 as select caccserno,journey_type__c,mob, */
+/* 202111 as month,product_desc, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET */
+/* ,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR */
+/* ,SUM(mo_good_acct) AS MO_GOOD_ACT */
+/* ,SUM(mo_dpd30_bal) AS mo_dpd30_bal */
+/* ,SUM(mo_good_bal) AS MO_GOOD_BAL */
+/* ,SUM(cyc_dpd30_re) as cyc_dpd30_bal */
+/* ,SUM(cyc_good_bal) as cyc_good_bal */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30 */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90 */
+/* ,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR */
+/* from Madhuri.portfolio_data_202111 */
+/* group by caccserno,journey_type__c,mob,product_desc; */
+/* Quit; */
+/*  */
+/* proc sql;create table oct21 as select caccserno,journey_type__c,mob, */
+/* 202110 as month,product_desc, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET */
+/* ,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR */
+/* ,SUM(mo_good_acct) AS MO_GOOD_ACT */
+/* ,SUM(mo_dpd30_bal) AS MO_dpd30_bal */
+/* ,SUM(mo_good_bal) AS MO_GOOD_BAL */
+/* ,SUM(cyc_dpd30_re) as cyc_dpd30_bal */
+/* ,SUM(cyc_good_bal) as cyc_good_bal */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30 */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90 */
+/* ,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR */
+/* from Madhuri.portfolio_data_202110 */
+/* group by caccserno,journey_type__c,mob,product_desc; */
+/* Quit; */
+/*  */
+/* proc sql;create table sep21 as select caccserno,journey_type__c,mob, */
+/* 202109 as month,product_desc, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET */
+/* ,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR */
+/* ,SUM(mo_good_acct) AS MO_GOOD_ACT */
+/* ,SUM(mo_dpd30_bal) AS mo_dpd30_bal */
+/* ,SUM(mo_good_bal) AS MO_GOOD_BAL */
+/* ,SUM(cyc_dpd30_re) as cyc_dpd30_bal */
+/* ,SUM(cyc_good_bal) as cyc_good_bal */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30 */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90 */
+/* ,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR */
+/* from Madhuri.portfolio_data_202109 */
+/* group by caccserno,journey_type__c,mob,product_desc; */
+/* Quit; */
+/*  */
+/* proc sql;create table aug21 as select caccserno,journey_type__c,mob, */
+/* 202108 as month,product_desc, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET */
+/* ,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR */
+/* ,SUM(mo_good_acct) AS MO_GOOD_ACT */
+/* ,SUM(mo_good_bal) AS MO_GOOD_BAL */
+/* ,SUM(mo_dpd30_bal) AS mo_dpd30_bal */
+/* ,SUM(cyc_dpd30_re) as cyc_dpd30_bal */
+/* ,SUM(cyc_good_bal) as cyc_good_bal */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30 */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90 */
+/* ,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR */
+/* from Madhuri.portfolio_data_202108 */
+/* group by caccserno,journey_type__c,mob,product_desc; */
+/* Quit; */
+/*  */
+/* proc sql;create table jul21 as select caccserno,journey_type__c,mob, */
+/* 202107 as month,product_desc, */
+/* SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_acct ELSE 0 END) AS CURRENT_BUCKET */
+/* ,SUM(CASE WHEN OVERDUECYCLEs = 0 THEN mo_good_bal ELSE 0 END) AS CURRENT_BUCKET_ENR */
+/* ,SUM(mo_good_acct) AS MO_GOOD_ACT */
+/* ,SUM(mo_good_bal) AS MO_GOOD_BAL */
+/* ,SUM(mo_dpd30_bal) AS MO_dpd30_bal */
+/* ,SUM(cyc_dpd30_re) as cyc_dpd30_bal */
+/* ,SUM(cyc_good_bal) as cyc_good_bal */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_acct  ELSE 0 END) AS COINCIDENTAL_30 */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_acct ELSE 0 END) AS COINCIDENTAL_90 */
+/* ,SUM(CASE WHEN overduecycles >= 1 THEN mo_good_bal ELSE 0 END) AS Coincidental_1_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 2 THEN mo_good_bal ELSE 0 END) AS Coincidental_30_ENR */
+/* ,SUM(CASE WHEN overduecycles >= 4 THEN mo_good_bal ELSE 0 END) AS Coincidental_90_ENR */
+/* from Madhuri.portfolio_data_202107 */
+/* group by caccserno,journey_type__c,mob,product_desc; */
+/* Quit; */
+
+
+
+
+/*  */
+/* data jul21(drop=caccserno); */
+/* set jul21; */
+/* caccserno1=caccserno*1; */
+/* Run; */
+/*  */
+/*  */
+/* data aug21(drop=caccserno); */
+/* set aug21; */
+/* caccserno1=caccserno*1; */
+/* Run; */
+/*  */
+/*  */
+/* data sep21(drop=caccserno); */
+/* set sep21; */
+/* caccserno1=caccserno*1; */
+/* Run; */
+/*  */
+/*  */
+/* data oct21(drop=caccserno); */
+/* set oct21; */
+/* caccserno1=caccserno*1; */
+/* Run; */
+/*  */
+/*  */
+/* data nov21(drop=caccserno); */
+/* set nov21; */
+/* caccserno1=caccserno*1; */
+/* Run; */
+/*  */
+/*  */
+/* data dec21(drop=caccserno); */
+/* set dec21; */
+/* caccserno1=caccserno*1; */
+/* Run; */
+/*  */
+/* data jan22(drop=caccserno); */
+/* set jan22; */
+/* caccserno1=caccserno*1; */
+/* Run; */
+/*  */
+/*  */
+/* data feb22(drop=caccserno); */
+/* set feb22; */
+/* caccserno1=caccserno*1; */
+/* Run; */
+
+
+/* 			MAR22		 */
+data mar22(drop=caccserno);
+set mar22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			APR22		 */
+data apr22(drop=caccserno);
+set apr22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			MAY22		 */
+data may22(drop=caccserno);
+set may22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			JUN22		 */
+data jun22(drop=caccserno);
+set jun22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			JUL22		 */
+data jul22(drop=caccserno);
+set jul22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			AUG22		 */
+data aug22(drop=caccserno);
+set aug22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			SEP22		 */
+data sep22(drop=caccserno);
+set sep22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			OCT22		 */
+data oct22(drop=caccserno);
+set oct22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			NOV22		 */
+data nov22(drop=caccserno);
+set nov22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			DEC22		 */
+data dec22(drop=caccserno);
+set dec22;
+caccserno1=caccserno*1;
+Run;
+
+/* 			Jan23		 */
+data jan23(drop=caccserno);
+set jan23;
+caccserno1=caccserno*1;
+Run;
+
+/* 			Feb23		 */
+data feb23(drop=caccserno);
+set feb23;
+caccserno1=caccserno*1;
+Run;
+
+/* 			Mar23		 */
+data mar23(drop=caccserno);
+set mar23;
+caccserno1=caccserno*1;
+Run;
+
+/* 			Apr23		 */
+data apr23(drop=caccserno);
+set apr23;
+caccserno1=caccserno*1;
+Run;
+
+/* 			May23			 */
+data may23(drop=caccserno);
+set may23;
+caccserno1=caccserno*1;
+Run;
+
+/* 			Jun23			 */
+data jun23(drop=caccserno);
+set jun23;
+caccserno1=caccserno*1;
+Run;
+
+/* 			Jul23			 */
+data jul23(drop=caccserno);
+set jul23;
+caccserno1=caccserno*1;
+Run;
+
+/* 			August23		 */
+data aug23(drop=caccserno);
+set aug23;
+caccserno1=caccserno*1;
+Run;
+
+/* 		  September23	 */
+data sep23(drop=caccserno);
+set sep23;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       October23		 */
+data oct23(drop=caccserno);
+set oct23;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       November23		 */
+data nov23(drop=caccserno);
+set nov23;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       December23		 */
+data Dec23(drop=caccserno);
+set Dec23;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       JANUARY 24		 */
+data JAN24(drop=caccserno);
+set JAN24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       FEBRUARY 24		 */
+data FEB24(drop=caccserno);
+set FEB24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       MARCH 24		 */
+data MAR24(drop=caccserno);
+set MAR24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       APRIL 24		 */
+data APR24(drop=caccserno);
+set APR24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       MAY 24		 */
+data MAY24(drop=caccserno);
+set MAY24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       JUN 24		 */
+data JUN24(drop=caccserno);
+set JUN24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       JUL 24		 */
+data JUL24(drop=caccserno);
+set JUL24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       AUG 24		 */
+data AUG24(drop=caccserno);
+set AUG24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       SEP 24		 */
+data SEP24(drop=caccserno);
+set SEP24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       OCT 24		 */
+data OCT24(drop=caccserno);
+set OCT24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       NOV 24		 */
+data NOV24(drop=caccserno);
+set NOV24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       DEC 24		 */
+data DEC24(drop=caccserno);
+set DEC24;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       JAN 25		 */
+data JAN25(drop=caccserno);
+set JAN25;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       FEB 25		 */
+data FEB25(drop=caccserno);
+set FEB25;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       MAR 25		 */
+data MAR25(drop=caccserno);
+set MAR25;
+caccserno1=caccserno*1;
+Run;
+
+/* 	       APR 25		 */
+data APR25(drop=caccserno);
+set APR25;
+caccserno1=caccserno*1;
+Run;
+
+/*  */
+data all_files;
+set jul22 aug22 sep22 oct22 nov22 dec22
+	jan23 feb23 mar23 apr23 may23 jun23 
+	jul23 aug23 sep23 oct23 nov23 Dec23
+	JAN24 FEB24 MAR24 APR24 MAY24 JUN24
+	Jul24 Aug24 SEP24 OCT24 NOV24 DEC24
+	Jan25 FEB25 MAR25 APR25;
+Run;
+
+
+/*  */
+proc sql;
+create table data as 
+select distinct a.*,
+				b.Base_Loan_Business_Unit,
+				b.accountopenmonth,
+				b.carded_flag,
+				b.campaign_name__c,
+				b.risk_segment__C,
+				b.base_segment
+
+from all_files a
+left join PS_NEW.ACQ_MASTER_APR25 b
+on a.caccserno1=b.caccserno;
+Quit;
+
+PROC SQL;
+CREATE TABLE CREDITCARD_IFB_APPLICATION__C AS 
+	Select Distinct
+			name as name length = 20,
+			createddate as createddate length = 20, 
+			utm_source__c as utm_source__c length = 200,
+			utm_medium__c as utm_medium__c length = 200
+FROM SFDC_CC.CREDITCARD_IFB_APPLICATION__C;
+QUIT;
+
+/* Data partner; */
+/* Set CREDITCARD_IFB_APPLICATION__C; */
+/* length partner $20;  */
+/* partner = utm_medium__c; */
+/* if utm_source__c not in ("Partner") then partner = "Not Partners"; */
+/* if find(utm_medium__c,"AKIKO","i") then partner = "AKIKO"; */
+/* if find(utm_medium__c,"Affiliate","i") then partner = "Affiliate"; */
+/* if find(utm_medium__c,"Affnadsutm_campaign","i") then partner = "Affnadsutm_campaign"; */
+/* if find(utm_medium__c,"MyGlamm","i") then partner = "MyGlamm"; */
+/* if find(utm_medium__c,"AM_TECH_VENTURES","i") then partner = "AM_TECH_VENTURES"; */
+/* if find(utm_medium__c,"Antworks","i") then partner = "Antworks"; */
+/* if find(utm_medium__c,"BANK_BDL","i") then partner = "BANK_BDL"; */
+/* if find(utm_medium__c,"BANK_BUDDY_LOAN","i") then partner = "BANK_BUDDY_LOAN"; */
+/* if find(utm_medium__c,"BankSat","i") then partner = "BankSathi"; */
+/* if find(utm_medium__c,"BFDL","i") then partner = "BFDL"; */
+/* if find(utm_medium__c,"CREDILIO","i") then partner = "CREDILIO_FINANCIAL"; */
+/* if find(utm_medium__c,"CREDIT_KARO","i") then partner = "CREDIT_KARO"; */
+/* if find(utm_medium__c,"XVRK","i") then partner = "XVRK"; */
+/* if find(utm_medium__c,"ZET","i") then partner = "ZET"; */
+/* if find(utm_medium__c,"prudent","i") then partner = "prudent"; */
+/* if find(utm_medium__c,"reculta","i") then partner = "reculta"; */
+/* if find(utm_medium__c,"roinet","i") then partner = "roinet"; */
+/* if find(utm_medium__c,"TransUnion","i") then partner = "TransUnion"; */
+/* if find(utm_medium__c,"SriBalaji","i") then partner = "SriBalaji"; */
+/* if find(utm_medium__c,"SquareFin","i") then partner = "SquareFin"; */
+/* if find(utm_medium__c,"Spectrum_digital","i") then partner = "Spectrum_digital"; */
+/* if find(utm_medium__c,"CHAHAL","i") then partner = "CHAHAL"; */
+/* if find(utm_medium__c,"Cards Hub","i") then partner = "Cards Hub"; */
+/* if find(utm_medium__c,"CashKaro","i") then partner = "Cash Karo"; */
+/* if find(utm_medium__c,"CreditMantri","i") then partner = "Credit Mantri"; */
+/* if find(utm_medium__c,"Fampay","i") then partner = "Fampay"; */
+/* if find(utm_medium__c,"IndiaLends","i") then partner = "India Lends"; */
+/* if find(utm_medium__c,"MMM","i") then partner = "MMM"; */
+/* if find(utm_medium__c,"Mobisafar","i") then partner = "Mobisafar"; */
+/* if find(utm_medium__c,"ONECODE","i") then partner = "ONECODE"; */
+/* if find(utm_medium__c,"Oolka","i") then partner = "Oolka"; */
+/* if find(utm_medium__c,"PB","i") then partner = "PaisaBazaar"; */
+/* if find(utm_medium__c,"PaisaBazaar","i") then partner = "PaisaBazaar"; */
+/* if find(utm_medium__c,"PB_EARN","i") then partner = "PaisaBazaar_EARN"; */
+/* if find(utm_medium__c,"Paytm","i") then partner = "Paytm"; */
+/* if find(utm_medium__c,"Pratithi","i") then partner = "Pratithi"; */
+/* if find(utm_medium__c,"Prtithi","i") then partner = "Pratithi"; */
+/* if find(utm_medium__c,"Q-Get_Financial_Tech","i") then partner = "Q-Get_Financial_Tech"; */
+/* if find(utm_medium__c,"Q_GET_FINANCIAL_TECH","i") then partner = "Q-Get_Financial_Tech"; */
+/* if find(utm_medium__c,"RAAJ_KHOSLA","i") then partner = "RAAJ_KHOSLA"; */
+/* if find(utm_medium__c,"eazycredit","i") then partner = "eazycredit"; */
+/* if find(utm_medium__c,"netambit","i") then partner = "netambit"; */
+/* if find(utm_medium__c,"tfp","i") then partner = "tfp"; */
+/* Run; */
+/*  */
+/* Data partners_dump; */
+/* set partner; */
+/* where utm_source__c = "Partner" and partner in */
+/* ('-GC_Web_Venture','AKIKO','AM_TECH_VENTURES','Adcanopus_Digital_Me', */
+/* 'Antworks','Atyati', */
+/* 'BANK_BDL','BFDL','BankSathi', */
+/* 'Bank_Karo','CHAHAL','CREDILIO_FINANCIAL', */
+/* 'CREDIT_KARO','Cards_Hub','Cash Karo', */
+/* 'Cash_Karo_S_Sec','Choiceconnect','Compounding_Happines', */
+/* 'Cred','Credit_Mantri','FTPL_Payments', */
+/* 'Fampay','Fino_Payments_S_Sec','GarnerTech','Gopaisa', */
+/* 'Growhiz','India Lends','MMM','Mobisafar', */
+/* 'Monetize_info','NTB_LazyPay','NTB_Urban_Money','NTB_VTL','NTL','Navi', */
+/* 'NetPaisa','Nxity_Techno','ONECODE','Oolka','POURING_POUNDS_INDIA','PRUDIGITAL_MEDIA', */
+/* 'PaisaBazaar','PaisaBazaar_EARN','Paytm','Pratithi','Q-Get_Financial_Tech', */
+/* 'Quality_Application','RAAJ_KHOSLA','Scofit_Fintech_Servi','Secure_Swipe','Signed', */
+/* 'Spectrum_digital','SquareFin','SriBalaji','Valueleaf_Services','Vconnect', */
+/* 'Wishfin_S_Sec','XVRK','ZER_1_HPCL','ZET','Zaggle', */
+/* 'app_ios','financebuddyHPCL','mdeal','netambit','prudent','reculta','roinet','tfp') */
+/* ; */
+/* Run; */
+
+Data partner;
+Set CREDITCARD_IFB_APPLICATION__C;
+length partner $20; 
+partner_flag = utm_source__c;
+if utm_source__c in ("Partner") then partner_flag = "Partners";
+else if utm_source__c not in ("Partner") then partner_flag = "Not_Partners";
+run;
+
+PROC SQL;
+create table data1 as
+select distinct
+	a.*,
+	b.partner_flag
+from data a
+left join partner b
+on a.sfdc_app_no=input(b.name,10.);
+quit;
+
+/* data data2; */
+/* set data1; */
+/* if utm_source__c = "Partner" or utm_source__c = "NTB_Partner" then partner_flag = "Partner"; */
+/* else partner_flag = "Non_partner"; */
+/* run; */
+
+/*  */
+proc sql;
+create table Vintage as 
+select  distinct 
+		count(caccserno1) as customers
+		,base_segment
+		,accountopenmonth
+		,carded_flag
+		,journey_type__c
+		,mob
+		,product_desc
+		,month
+		,campaign_name__c
+		,risk_segment__C
+		,SUM(CURRENT_BUCKET) AS CURRENT_BUCKET
+		,SUM(CURRENT_BUCKET_ENR) AS CURRENT_BUCKET_ENR
+		,SUM(MO_GOOD_ACT) AS MO_GOOD_ACT
+		,SUM(mo_good_bal) AS mo_good_bal
+		,SUM(mo_dpd30_bal) AS mo_dpd30_bal
+		,SUM(cyc_good_bal) AS cyc_good_bal
+		,SUM(cyc_dpd30_bal) AS cyc_dpd30_bal
+		,SUM(COINCIDENTAL_30) AS COINCIDENTAL_30
+		,SUM(COINCIDENTAL_90) AS COINCIDENTAL_90
+		,SUM(Coincidental_1_ENR) AS Coincidental_1_ENR
+		,SUM(Coincidental_30_ENR) AS Coincidental_30_ENR
+		,SUM(Coincidental_90_ENR) AS Coincidental_90_ENR
+		,Sum(pdd_nr) as pdd_nr
+		,Sum(pdd_dr) as pdd_dr
+		,Sum(rdd_nr) as rdd_nr
+		,Sum(rdd_dr) as rdd_dr
+
+from 	data1
+group by 	base_segment,
+			accountopenmonth,
+			carded_flag,
+			journey_type__c,
+			mob,
+			partner,
+			product_desc,
+			month,
+			campaign_name__c,
+			risk_segment__C;
+Quit;
+
+/* NOTE: The data set WORK.ALL has 25158296 observations and 15 variables. */
+
+
+proc sql;
+select  accountopenmonth,
+		carded_flag,
+		count(caccserno)
+from PS_NEW.ACQ_MASTER_APR25
+where 	base_Segment in ('SA','Corp Sal') and 
+		campaign_name__c in ('ETB_PA','ETB_PA_PA_','ETB_PQ','ETB_PA_PQ_') and 
+		journey_type__c in ('ETB As Is') and 
+		cardvariant not in ('FIRST WOW!',
+							'FIRST Business',
+							'FIRST Business',
+							'FIRST Corporate',
+							'FIRST Corporate Staff')
+group by carded_flag,accountopenmonth;
+RUN;
+
+
+
+
