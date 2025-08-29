@@ -129,3 +129,559 @@ set novpro1 decpro1 janpro1 febpro1 marpro1 aprpro1 ;
 
 proc freq data = se6m60wtl;
 tables new;
+
+
+---------sttd
+
+
+
+
+
+/* Filtering the conscideration set on multiple filters. */
+DATA business_review_acq (KEEP = average_monthly__c
+										base_loan_Business_unit
+										base_segment
+										bcc__c
+										caccserno
+										carded_flag
+										risk_segment__c
+										sfdc_app_no
+										trv
+										cibil_band
+										employment_type__c
+										crn
+										accountopenmonth
+										flag_6m30_me_nr
+										flag_6m30_me_dr
+										flag_3m30_me_nr
+										flag_3m30_me_dr
+										bcc_c
+										cardvariant
+										journey_type__c
+										dob
+										campaign_name__c
+										cpv_waiver_eligible__c
+										campaign_code__c
+										campaign_name__c);
+
+SET PS_NEW.ACQ_FINAL_DEC23;
+/* Filter #1 on account open month */
+WHERE	accountopenmonth >= 202306 AND accountopenmonth <= 202312 AND
+/* Filter #2 on Journey Type  */
+		journey_type__c IN  ('ETB As Is', 'NTB') and 
+/* Filter #3 on card variantg i.e, getting only unsecured cards.*/
+		cardvariant NOT IN  ('FIRST WOW!','FIRST Family');
+
+RUN;
+
+/* Total Number of Observations : | 4,44,252 | from acquisition table. */
+/* This is the Base Data for us. */
+
+/*--------*/
+/* 1. AGE */
+/*--------*/
+DATA business_review_acq;
+SET business_review_acq;
+YOB1 = INPUT(DOB,4.); RUN;
+DATA business_review_acq;
+length age_band $8;
+SET business_review_acq;
+AGE = 2023 - yob1;
+if age < 32 then age_band = "LT 32"; 
+else  age_band = "GT 32"; run;
+proc freq data = business_review_acq;
+tables age_band; RUN;
+
+/*-----------*/
+/* 2. Carded */
+/*-----------*/
+data business_review_acq;
+set business_review_acq;
+if Carded_flag in ("Carded","Multi-Carded") then carded_flag = 'Multi-Carded';
+if Carded_flag in ("Single-Carded") then carded_flag = 'Single-Carded';
+if Carded_flag in ("NA","No-Hit","Non-Carded") then carded_flag = 'Non-Carded';
+if missing(Carded_flag) then carded_flag = 'Missing'; RUN;
+proc freq data = business_review_acq;
+tables Carded_flag; RUN;
+
+/*---------------*/
+/* 3. Cibil-Band */
+/*---------------*/
+data business_review_acq;
+set business_review_acq;
+length cibil_band $10;
+if bcc__c = -1 then cibil_band = 'No-Hit';
+if 0 <= bcc__c <= 730 then cibil_band = 'LT 730';
+if 730 < bcc__c <= 750 then cibil_band = '730 - 750';
+if 750 < bcc__c <= 770 then cibil_band = '750 - 770';
+if 770 < bcc__c  then cibil_band = 'GT 770'; RUN;
+
+proc freq data = business_review_acq;
+tables cibil_band; RUN;
+
+/*-------------*/
+/* 4. TRV Band */
+/*-------------*/
+data business_review_acq;
+set business_review_acq;
+total_Rel = coalesce(sum(trv, average_monthly__c), 0);
+run;
+data business_review_acq;
+length Rel_band $ 10;
+set  business_review_acq;
+
+if  		  	total_Rel <   2000  then Rel_band =    'LT 2K';
+if  2000   <=  	total_Rel <   100000  then Rel_band =    '2K-1L';
+if 100000 <=   	total_Rel 			 then Rel_band = 	'GT 1L';RUN;
+
+proc freq data = business_review_acq;
+tables Rel_band; RUN;
+
+/*---------------*/
+/* 5. Employment */
+/*---------------*/
+data business_review_acq;
+set business_review_acq;
+if employment_type__c in ('SEP','SENP') then employment_type__c = 'S Emp';
+
+proc freq data = business_review_acq;
+tables employment_type__c; RUN;
+
+/*-----------------*/
+/* 6. Risk Segment */
+/*-----------------*/
+data business_review_acq;
+set business_review_acq;
+if risk_segment__c in ('B Score','Bronze','Bronze+','Bureau Vintage <6','Gold','Platinum','Platinum Plus','Salaried Prime','Silver') 
+		then risk_segment__c = 'Others';
+if risk_segment__c in ('High2','NoHit_V_High','Noncarded_V_High','V_High', 'VHIGH','VHIGH') 
+		then risk_segment__c = 'V High';
+if risk_segment__c in ('High','Noncarded_High', 'HIGH1') 
+		then risk_segment__c = 'High';
+if risk_segment__c in ('Medium','Noncarded_Mid') 
+		then risk_segment__c = 'Mid';
+if risk_segment__c in ('Low') then risk_segment__c = 'Low';
+if risk_segment__c in ('V_Low','V Low','VLOW', 'V_LOW') then risk_segment__c = 'V Low';
+if risk_segment__c in ('NA','NULL') then risk_segment__c = 'NA';
+else risk_segment__c = risk_segment__c;RUN;
+
+proc freq data = business_review_acq;
+tables risk_segment__c; RUN;
+
+/*------------------*/
+/* 7. Campaign Name */
+/*------------------*/
+data business_review_acq;
+set business_review_acq;
+if campaign_name__c in ('Corp_PA', 'ETB_PA', 'ETB_PA_', 'FPL_PA', 'RURL_PA') then campaign_name__c = 'PA'; 
+if campaign_name__c in ('ETB_PQ', 'ETB_PQ_', 'RURL_PQ') then campaign_name__c = 'PQ';
+if campaign_name__c in ('Asset C', 'EMP', 'RURL','SEC_Cha','Semi_Se') then campaign_name__c = 'Others'; RUN;
+proc freq data = palash.business_review_acq;
+tables campaign_name__c; RUN;
+
+
+/*-------------*/
+/* Trade Lines */
+/*-------------*/
+/* TL Data Importing and editing. */
+proc sql;
+create table BUSINESS_REVIEW_TL as
+select * 
+from BIUBUDLI.TL_MST_CC
+where crn in (select crn from PALASH.BUSINESS_REVIEW_ACQ); QUIT;
+/* Liab has Total 15298090 observation and has 3,80,932 unique observations of 4,44,000 total customers. */
+/* Account Open Month Merge in TL Data */
+
+proc sql;
+create table BUSINESS_REVIEW_TL as
+select a.*,b.accountopenmonth
+from BUSINESS_REVIEW_TL a
+left join palash.BUSINESS_REVIEW_ACQ b
+on a.crn = b.crn; QUIT;
+data BUSINESS_REVIEW_TL;
+set BUSINESS_REVIEW_TL;
+import_month = Month(bcc_date);
+accountopenmonth1 = put(accountopenmonth,10.);
+sourced_month = substr(accountopenmonth1,9,4);
+sourced_month1 = input(sourced_month,10.); 
+month_diff = sourced_month1 - import_month;RUN;
+data TL;
+set BUSINESS_REVIEW_TL;
+where month_diff in (0,1,2,3) and ReportingMemberShortName not in ('IDFC FIRST BANK'); RUN;
+/* 3,80,932 */
+
+
+/*------------*/
+/* 8. Live PL */
+/*------------*/
+proc sql;
+create table live_pl_table as 
+select  crn, 
+		count(crn) as Live_pl
+from TL
+where missing(DATE_CLOSED) and ACCOUNT_DESC in ('Personal Loan','Microfinance – Personal Loan')
+group by crn; QUIT;
+
+/* 26,605 Rows and 2 columns */
+
+proc sql;
+create table BUSINESS_REVIEW_ACQ as
+select a.*, 
+		b.Live_pl
+from BUSINESS_REVIEW_ACQ a
+left join live_pl_table b
+on a.crn = b.crn; QUIT;
+/* 4,44,279 */
+data BUSINESS_REVIEW_ACQ;
+set BUSINESS_REVIEW_ACQ;
+if live_pl >= 1 then live_pl_band = 1;
+else live_pl_band = 0; RUN;
+/* 4,44,279 */
+proc freq data = BUSINESS_REVIEW_ACQ;
+tables live_pl_band; RUN;
+/*  */
+
+/*------------*/
+/* 9. EVER PL */
+/*------------*/
+proc sql;
+create table ever_pl as 
+select  crn, 
+		count(crn) as ever_pl
+from TL
+where not missing(DATE_CLOSED) and ACCOUNT_DESC in ('Personal Loan','Microfinance – Personal Loan')
+group by crn; QUIT;
+/* 28,567 by 2 */
+proc sql;
+create table BUSINESS_REVIEW_ACQ as
+select a.*, 
+		b.ever_pl
+from BUSINESS_REVIEW_ACQ a
+left join ever_pl b
+on a.crn = b.crn; QUIT;
+/* 4,44,279 */
+data BUSINESS_REVIEW_ACQ;
+set BUSINESS_REVIEW_ACQ;
+if ever_pl >= 1 then ever_pl_band = 1;
+else ever_pl_band = 0; RUN;
+/* 4,44,279 */
+proc freq data = BUSINESS_REVIEW_ACQ;
+tables ever_pl_band; RUN;
+
+
+/*-----------------*/
+/* 10. Ever Carded */
+/*-----------------*/
+proc sql;
+create table ever_cc as 
+select  crn, 
+		count(crn) as ever_CC
+from TL
+where not missing(DATE_CLOSED) and ACCOUNT_DESC in ('Credit Card')
+group by crn; QUIT;
+/* 31,469 */
+proc sql;
+create table BUSINESS_REVIEW_ACQ as
+select a.*, 
+		b.ever_cc
+from BUSINESS_REVIEW_ACQ a
+left join ever_cc b
+on a.crn = b.crn; QUIT;
+/* 4,44,279 */
+data BUSINESS_REVIEW_ACQ;
+set BUSINESS_REVIEW_ACQ;
+if not missing(ever_cc) then ever_cc_band = 1;
+else ever_cc_band = 0; RUN;
+/* 4,44,279 */
+proc freq data = BUSINESS_REVIEW_ACQ;
+tables ever_cc_band; RUN;
+
+
+/*-----------------*/
+/* Enquiry Details */
+/*-----------------*/
+proc sql;
+create table sttdiq as
+select distinct	crn as b_crn, 
+				bcc_date,
+				DateOfEnquiry,
+				EnquiryAmount,
+				EnquiryPurpose_Desc 
+from BIUBUDLI.IQ_MST_cc
+where crn in (select crn from BUSINESS_REVIEW_ACQ); QUIT;
+
+
+/*----------------------------------------------*/
+/* Removing all the enquiries post account open */
+/*----------------------------------------------*/
+
+
+/*  */
+/*  */
+proc SQL;
+create table IQ_data_base1 As
+select distinct a.*,
+				b.caccserno, 
+				b.accountopenmonth,
+				b.flag_6m30_me_nr,
+				b.flag_6m30_me_dr,
+				b.flag_3m30_me_nr,
+				b.flag_3m30_me_dr
+from sttdiq a
+left join business_review_acq b
+ON a.b_crn = b.crn; QUIT;
+/* Total observations are : 90,96,723 */
+/* 90,97,905 */
+/*  Unique Cases :    2,87,417   	  */
+
+
+/*  */
+/*  */
+data IQ_data_base2;
+set IQ_data_base1;
+bcc_date_int=100*year(BCC_DATE)+month(BCC_DATE);
+month_diff = accountopenmonth - bcc_date_int; RUN;
+/* Total observations are : 85,30,657 */
+/*  Unique Cases :    2,87,417   */
+Data IQ_data_base2;
+SET IQ_data_base2;
+where month_diff in (0,1,2,3); RUN;
+/* Total observations are : 32,35,926 */
+/* Unique Cases :    2,33,542 */
+
+
+/*  */
+/*  */
+data IQ_data_base2; 
+set IQ_data_base1; 
+Enquiry_Date = 100*year(DateOfEnquiry)+month(DateOfEnquiry); RUN;
+/* Total observations are : 32,35,926 */
+/*  Unique Cases :    1,88,259 */
+
+
+data IQ_data_base3; 
+set  IQ_data_base2; 
+/* Enquiry in last 6 month */
+if 202301 <= Enquiry_Date <= 202306 and accountopenmonth = 202306 then enquiry_6m = 1;
+else if 202302 <= Enquiry_Date <= 202307 and accountopenmonth = 202307 then enquiry_6m = 1;  
+else if 202303 <= Enquiry_Date <= 202308 and accountopenmonth = 202308 then enquiry_6m = 1;
+else if 202304 <= Enquiry_Date <= 202309 and accountopenmonth = 202309 then enquiry_6m = 1;
+else if 202305 <= Enquiry_Date <= 202310 and accountopenmonth = 202310 then enquiry_6m = 1;
+else if 202306 <= Enquiry_Date <= 202311 and accountopenmonth = 202311 then enquiry_6m = 1;
+else if 202307 <= Enquiry_Date <= 202312 and accountopenmonth = 202312 then enquiry_6m = 1;
+else enquiry_6m = 0;
+/* Enquiry in last 12 month */
+if 202206 <= Enquiry_Date <= 202306 and accountopenmonth = 202306 then enquiry_12m = 1;
+else if 202207 <= Enquiry_Date <= 202307 and accountopenmonth = 202307 then enquiry_12m = 1;  
+else if 202208 <= Enquiry_Date <= 202308 and accountopenmonth = 202308 then enquiry_12m = 1;
+else if 202209 <= Enquiry_Date <= 202309 and accountopenmonth = 202309 then enquiry_12m = 1;
+else if 202210 <= Enquiry_Date <= 202310 and accountopenmonth = 202310 then enquiry_12m = 1;
+else if 202211 <= Enquiry_Date <= 202311 and accountopenmonth = 202311 then enquiry_12m = 1;
+else if 202212 <= Enquiry_Date <= 202312 and accountopenmonth = 202312 then enquiry_12m = 1; 
+else enquiry_12m = 0; RUN;
+/* 90,97,905 */
+
+
+/* Enquiry Vriables */
+/*  */
+/*  */
+proc sql;
+create table sample as
+select distinct 
+b_crn,
+sum(enquiry_6m) as IQ_in_6m,
+sum(enquiry_12m) as IQ_in_12m,
+sum(case when EnquiryPurpose_Desc in ('Personal Loan') and enquiry_6m = 1 then 1 else 0 end) as IQ_PL_6M,
+sum(case when EnquiryPurpose_Desc in ('Personal Loan') and enquiry_12m = 1 then 1 else 0 end) as IQ_PL_12M,
+sum(case when EnquiryPurpose_Desc in ('Business Loan - Unsecured', 'Consumer Loan','Education Loan'
+									  'Loan to Professional', 'Credit Card', 'Overdraft', 'Fleet Card',
+									  'Corporate Credit Card', 'Kisan Credit Card', 'Loan on Credit Card', 
+									  'Prime Minister Jaan Dhan Yojana – Overdraft', 'Mudra Loans – Shishu / Kishor / Tarun', 
+									  'P2P Personal Loan', 'P2P Education Loan', 'Business Loan – Unsecured', 'Other') and 
+										enquiry_6m = 1 then 1 else 0 end) as IQ_Unsec_6M,
+sum(case when EnquiryPurpose_Desc in ('Business Loan - Unsecured', 'Consumer Loan','Education Loan'
+									  'Loan to Professional', 'Credit Card', 'Overdraft', 'Fleet Card',
+									  'Corporate Credit Card', 'Kisan Credit Card', 'Loan on Credit Card', 
+									  'Prime Minister Jaan Dhan Yojana – Overdraft', 'Mudra Loans – Shishu / Kishor / Tarun', 
+									  'P2P Personal Loan', 'P2P Education Loan', 'Business Loan – Unsecured', 'Other') and 
+										enquiry_12m = 1 then 1 else 0 end) as IQ_Unsec_12M
+
+from IQ_DATA_BASE3
+group by b_crn; QUIT;
+/* 2,33,542 */
+
+
+proc sql;
+CREATE TABLE BUSINESS_REVIEW_ACQ AS
+SELECT  a.*,
+		b.*
+FROM BUSINESS_REVIEW_ACQ a
+LEFT JOIN sample b
+ON a.crn = b.b_crn; QUIT;
+
+
+/*-----------------------------------------*/
+/*	11. No. of enquiries In Last 6 Months  */
+/*-----------------------------------------*/
+proc freq data=BUSINESS_REVIEW_ACQ; 
+tables IQ_in_6m; RUN;
+
+
+/*-----------------------------------------------------------*/
+/*	12. No. of enquiries In Last 12 Months  */
+/*-----------------------------------------------------------*/
+proc freq data=sample; 
+tables IQ_in_12m; RUN;
+
+
+/*-----------------------------------------------------------*/
+/*	13. No. of PL enquiries In Last 6 Months  */
+/*-----------------------------------------------------------*/
+proc freq data=sample; 
+tables IQ_PL_6M; RUN;
+
+
+/*-----------------------------------------------------------*/
+/*	14. No. of PL enquiries In Last 12 Months  */
+/*-----------------------------------------------------------*/
+proc freq data=sample; 
+tables IQ_PL_12M; RUN;
+
+
+/*-----------------------------------------------------------*/
+/*	14. No. of Unsecured enquiries In Last 6 Months  */
+/*-----------------------------------------------------------*/
+proc freq data=sample; 
+tables IQ_Unsec_6M; RUN;
+
+
+/*-----------------------------------------------------------*/
+	/*	15. No. of Unsecured enquiries In Last 12 Months  */
+/*-----------------------------------------------------------*/
+proc freq data=sample; 
+tables IQ_Unsec_12M; RUN;
+
+
+/* 							Segment : 2    						 */
+/*  */
+/*  */
+FILENAME REFFILE FILESRVC FOLDERPATH='/Users/priypalash.sahu/My Folder/My Snippets/ETB'  FILENAME='STTD_Master_Data.xlsx';
+
+PROC IMPORT DATAFILE=REFFILE
+	DBMS=XLSX
+	OUT=WORK.master_data;
+	GETNAMES=YES;
+RUN;
+
+
+
+/* In Order to Make segmentations we will use Decision Tree Model. */
+/* The Variables that we will use : 							   */
+/* 1. Base Segment    */
+/* 2. Campaign Code   */
+/* 3. Risk Segment    */
+/* 4. Carded Flag     */
+/* 5. Cibil Band      */
+/* 6. Journey Type    */
+/* 7. Employment Type */
+/* 8. Live PL Band    */
+/* 9. Uns PL IQ 6M    */
+/* 10. PL IQ 6M 	  */
+/* 11. AMB 			  */
+
+
+/* Flag 3MOB 30+ */
+data WORK.MASTER_DATA1;
+set WORK.MASTER_DATA;
+if flag_3m30_me_nr = 0 OR missing(flag_3m30_me_nr)  then flag_3m_v = 'GUD';
+else flag_3m_v = 'BAD'; RUN;
+
+data master_data2 (keep= flag_3m_v AMB_BAND base_Segment campaign_name__c carded_flag Cibil_Score_Band 
+employment_type__c risk_segment__c journey_type__c live_pl_band IQ_Unsec_6M_band   IQ_PL_6M_band);
+set master_data1; RUN;
+
+															/*  Oversampling  */
+
+proc sort data= WORK.MASTER_DATA2 out=WORK.MASTER_DATA3; by flag_3m_v; run;
+proc surveyselect data=MASTER_DATA3 out=MASTER_DATA4 method=urs n=(75000, 444003) seed=1234 outhits;
+strata flag_3m_v;
+run;
+proc freq data = MASTER_DATA4; tables flag_3m_v; RUN;
+
+data MASTER_DATA5;
+    set MASTER_DATA4;
+    if cmiss(of _all_) then delete; run;
+
+data master_train master_test; 
+set MASTER_DATA5; 
+if selected = 1 then output master_train; 
+else output master_test; 
+drop selected;
+run;
+
+proc freq data=master_data5; table flag_3m_v; run;
+proc freq data=master_train; table flag_3m_v; run;
+proc freq data=master_test; table flag_3m_v; run;
+
+
+
+data hypertuning;
+input maxdepth;
+datalines;
+10 
+15 
+18 
+20 
+25
+;
+
+/* Max Depth 25 */
+%macro run_model(maxdepth);
+ods graphics on;
+PROC HPSPLIT DATA=MASTER_DATA4 maxdepth=&maxdepth;
+    CLASS   flag_3m_v AMB_BAND base_Segment campaign_name__c
+			carded_flag Cibil_Score_Band employment_type__c risk_segment__c 
+			journey_type__c IQ_Unsec_6M_band   IQ_PL_6M_band;
+    MODEL flag_3m_v(EVENT='BAD') =   base_Segment campaign_name__c
+								carded_flag Cibil_Score_Band employment_type__c risk_segment__c 
+								journey_type__c live_pl_band IQ_Unsec_6M_band   IQ_PL_6M_band AMB_BAND;
+    PARTITION FRACTION(VALIDATE=0.3 SEED=1234);
+    OUTPUT OUT = SCORED;
+run;
+%mend;
+
+/* Hypertuning */
+data _null_;
+set hypertuning;
+call execute('%run_model(' || maxdepth || ');');
+run;
+
+/* Decision Tree */
+ods graphics on;
+PROC HPSPLIT DATA=MASTER_DATA4 maxdepth=25 nodes=detail;
+    CLASS   flag_3m_v AMB_BAND base_Segment campaign_name__c
+			carded_flag Cibil_Score_Band employment_type__c risk_segment__c 
+			journey_type__c IQ_Unsec_6M_band   IQ_PL_6M_band;
+    MODEL flag_3m_v(EVENT='BAD') =   base_Segment campaign_name__c
+								carded_flag Cibil_Score_Band employment_type__c risk_segment__c 
+								journey_type__c live_pl_band IQ_Unsec_6M_band   IQ_PL_6M_band AMB_BAND;
+    PARTITION FRACTION(VALIDATE=0.3 SEED=1234);
+	CODE FILE='heart_train.sas';
+    OUTPUT OUT = SCORED;
+run;
+
+DATA heart_test_scored;
+    SET MASTER_DATA1;
+    %INCLUDE 'heart_train.sas';
+RUN;
+
+
+
+
+
+
+
+
+
+
+
