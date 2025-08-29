@@ -1,0 +1,2319 @@
+automated-----
+
+Options compress=yes;
+libname aneesha "/Policy/aneesha.choudhary";
+libname cdw '/BIUSASDATA/BIUDATANAS/Rahul Dasgupta/cdw'; 
+libname charan "/PolicyNew/"; 
+libname Madhuri '/BIUSASDATA/BIUDATANAS/Madhuri Chhabra'; 
+libname shpravee '/Policy/PraveenSingh'; 
+libname rajendra "/Policy/rajendra.bhoir";
+libname ct "/Policy/charanteja.beemanapalli";
+
+
+data ever_emi_data (keep = merchid merchname merchtype 
+outstinstamount overdueamount serno 
+caccserno originalamount outstprincipalamount 
+creationdate instalmentsnumber interestrate 
+status trxndescription instalmentplanserno);
+set Prime.tctdbs_cinstalments;
+Run;
+
+
+data check1;
+set ever_emi_data;
+format TRXNDATE yymmn6.;
+TRXNDATE =input(creationdate,anydtdte10.);
+run;
+
+data check2;
+set check1;
+/* where   TRXNDATE < '01Mar2025'd; */
+
+proc sql;
+select min(TRXNDATE) as txnm format date9., max(TRXNDATE) as txmn format date9.  from check2;
+
+/* Instal_ment_transactions */
+
+/*Balcon */
+data Balcon_test;
+set check2;
+if outstinstamount>0 then live=1;
+else live=0;
+if instalmentplanserno in (482,602,604,606,608,610,612,614,616,618,762,764,766,
+936,938,940,892,890,888,886,884,882,880,878,876,874,872,870,868) then Balcon = 1; 
+else Balcon = 0;
+Run;
+
+data Balcon_test2;
+set Balcon_test;
+where Balcon = 1 and status in ("NORM", "PAID");
+run;
+
+proc sql;
+select count(distinct(caccserno)) as dist, count(caccserno) as cnt from Balcon_test2;
+
+/* Proc sql; */
+/* select sum(input(originalamount,10.))/count(caccserno) from Balcon_test2; */
+/* quit; */
+
+
+proc freq data = Balcon_test2;
+tables TRXNDATE;
+
+/* proc freq data= Balcon_test2; */
+/* tables accountopenmonth; */
+/*  */
+/* proc freq data = Balcon_test2; */
+/* tables live balcon status Accountopenmonth; */
+
+proc sort data = Balcon_test2 out=Balcon_test3;
+by serno TRXNDATE ;
+run;
+
+data Balcon_test4;
+set Balcon_test3;
+by serno;
+if last.serno then n=1;
+else n+1;
+
+data Balcon_test5;
+set Balcon_test4;
+where n =1;
+
+
+data Balcon_test6;
+set Balcon_test5;
+blbu_new= "Balnc_con";
+run;
+
+/* Proc sql; */
+/* select sum(input(originalamount,10.))/10000000 from Balcon_test6; */
+/* quit; */
+
+proc sql;
+select count(distinct(caccserno)) as dist, count(caccserno) as cnt from Balcon_test6;
+
+/* BT_EMI*/
+data BTEMI_test;
+set check2;
+if outstinstamount>0 then live=1;
+else live=0;
+if instalmentplanserno in (162,806) then BT_emi = 1; 
+else BT_emi = 0;
+Run;
+
+
+data BTEMI_test2;
+set BTEMI_test;
+where BT_emi = 1 and status in ("NORM", "PAID");
+
+proc freq data = BTEMI_test2;
+tables TRXNDATE;
+
+
+
+proc sort data = BTEMI_test2 out=BTEMI_test3;
+by serno TRXNDATE;
+
+run;
+
+data BTEMI_test4;
+set BTEMI_test3;
+by serno;
+if last.serno then n=1;
+else n+1;
+
+data BTEMI_test5;
+set BTEMI_test4;
+where n =1;
+
+data BTEMI_test6;
+set BTEMI_test5;
+blbu_new= "BT_emi";
+run;
+
+/* Proc sql; */
+/* select sum(input(originalamount,10.))/10000000 from BTEMI_test6; */
+/* quit; */
+
+
+/*Trxn_EMI  */
+data Trxn_EMI_test;
+set check2;
+if outstinstamount>0 then live=1;
+else live=0;
+if instalmentplanserno in (24,26,28,30,32,34,36,38,40,42,44,866,864,862,
+860,858,856,854,852,850,848,846,844,842,842,1002,1004,1006,1008,1010,1012) then Trxn_EMI = 1; 
+else Trxn_EMI = 0;;
+Run;
+
+data Trxn_EMI_test2;
+set Trxn_EMI_test;
+where Trxn_EMI = 1 and status in ("NORM", "PAID");
+run;
+
+
+proc freq data = Trxn_EMI_test2;
+tables  TRXNDATE;
+
+
+
+proc sort data = Trxn_EMI_test2 out=Trxn_EMI_test3;
+by serno TRXNDATE ;
+run;
+
+data Trxn_EMI_test4;
+set Trxn_EMI_test3;
+by serno;
+if last.serno then n=1;
+else n+1;
+
+data Trxn_EMI_test5;
+set Trxn_EMI_test4;
+where n =1;
+
+data Trxn_EMI_test6;
+set Trxn_EMI_test5;
+blbu_new= "Trxn_EMI";
+run;
+
+/* Proc sql; */
+/* select sum(input(originalamount,10.))/10000000 from Trxn_EMI_test6; */
+/* quit; */
+
+/*Merc_EMI */
+data Merc_EMI_test;
+set check2;
+if outstinstamount>0 then live=1;
+else live=0;
+if instalmentplanserno in (704,52,934,804,932,802,1122) then Merc_EMI = 1; 
+else Merc_EMI = 0;
+Run;
+
+data Merc_EMI_test2;
+set Merc_EMI_test;
+where Merc_EMI = 1 ;
+run;
+
+
+proc freq data = Merc_EMI_test2;
+tables live Merc_EMI status TRXNDATE;
+
+proc sort data = Merc_EMI_test2 out=Merc_EMI_test3;
+by serno TRXNDATE ;
+run;
+
+data Merc_EMI_test4;
+set Merc_EMI_test3;
+by serno;
+if last.serno then n=1;
+else n+1;
+
+data Merc_EMI_test5;
+set Merc_EMI_test4;
+where n =1;
+
+data Merc_EMI_test6;
+set Merc_EMI_test5;
+blbu_new= "Merc_EMI";
+run;
+
+/* Proc sql; */
+/* select sum(input(originalamount,10.))/10000000 from Merc_EMI_test6; */
+/* quit; */
+
+/*wtl */
+data wtl_test;
+set check2;
+if outstinstamount>0 then live=1;
+else live=0;
+if instalmentplanserno in (642,644,646,648,650,652,654,656,658,660,524,562) 
+then wtl = 1; else wtl = 0;
+Run;
+
+
+data wtl_test2;
+set wtl_test;
+where wtl = 1 and status in ("NORM", "PAID");
+run;
+/*22171  */
+
+proc freq data = wtl_test2;
+tables live wtl status TRXNDATE;
+
+proc sort data = wtl_test2 out=wtl_test3;
+by serno TRXNDATE ;
+run;
+
+data wtl_test4;
+set wtl_test3;
+by serno;
+if last.serno then n=1;
+else n+1;
+
+data wtl_test5;
+set wtl_test4;
+where n =1;
+
+data wtl_test6;
+set wtl_test5;
+blbu_new= "WTL";
+run;
+
+/* Proc sql; */
+/* select sum(input(originalamount,10.))/10000000 from wtl_test6; */
+/* quit; */
+
+
+
+/*otl */
+data otl_test;
+set check2;
+if outstinstamount>0 then live=1;
+else live=0;
+if instalmentplanserno in (962,964,966,968,970,972,974,976,978,980,982,984,986,988,990,992,994) 
+then otl = 1; else otl = 0;
+Run;
+
+
+
+data otl_test2;
+set otl_test;
+where otl = 1 and status in ("NORM", "PAID");
+run;
+/*22171  */
+
+proc freq data = otl_test2;
+tables live otl status TRXNDATE;
+
+proc sort data = otl_test2 out=otl_test3;
+by serno TRXNDATE ;
+run;
+
+data otl_test4;
+set otl_test3;
+by serno;
+if last.serno then n=1;
+else n+1;
+
+data otl_test5;
+set otl_test4;
+where n =1;
+
+data otl_test6;
+set otl_test5;
+blbu_new= "OTL";
+run;
+
+
+/* Proc sql; */
+/* select sum(input(originalamount,10.))/10000000 from otl_test6; */
+/* quit; */
+
+
+data emi_tran (keep =serno  caccserno originalamount creationdate TRXNDATE blbu_new live)   ;
+set Balcon_test6 BTEMI_test6 Trxn_EMI_test6 Merc_EMI_test6 wtl_test6 otl_test6;
+
+proc freq data = emi_tran;
+tables  blbu_new * live/nocol norow nopercent;
+
+
+/*Ever_BT  */
+
+proc sql;
+create table btdata as
+select ct.*,p.custidnumber as CRN ,ca.numberx as AccNumber 
+from prime.TCTDBS_VCTRANSACTIONS ct
+left join prime.TCTDBS_VCARDX x
+on ct.cardserno=x.serno
+left join prime.TCTDBS_PEOPLE p 
+on x.peopleserno=p.serno 
+left join prime.TCTDBS_CACCOUNTS ca 
+on x.caccserno=ca.serno
+where ct.i044_reason_code='btod';
+quit;
+
+
+Data BTDATA;
+set btdata;
+BTTEXT=SUBSTR(i048_text_data,1,7);
+if BTTEXT='Onecard' or BTTEXT='Reversa' then BT_FLAG=0;else BT_FLAG=1;
+Run;
+
+proc freq data=BTDATA;
+table BT_FLAG; run;
+
+/*TRXNDATE =input(creationdate,anydtdte10.);  */
+
+data BTDATA2;
+set BTDATA;
+format TRXNDATE yymmn6.;
+TRXNDATE =input(i013_trxn_date,anydtdte10.);
+/* where  input(i013_trxn_date, yymmdd10.) < '01MAR2025'd; */
+run;
+
+proc freq data=BTDATA2;
+table TRXNDATE; run;
+
+proc sort data = BTDATA2 out=BTDATA3;
+by serno TRXNDATE ;
+run;
+
+data BTDATA4 ;
+set BTDATA3;
+by serno;
+if last.serno then n=1;
+else n+1;
+
+data BTDATA5;
+set BTDATA4;
+where n =1 ;
+
+
+data BTDATA6;
+set BTDATA5;
+blbu_new= "BT-Ever";
+live= 1;
+run;
+
+data BTDATA7 (keep= serno caccserno i004_amt_trxn i013_trxn_date TRXNDATE blbu_new live);
+set BTDATA6;
+
+data BTDATA8 (drop =i004_amt_trxn i013_trxn_date)  ;
+set BTDATA7;
+originalamount= i004_amt_trxn;
+creationdate= i013_trxn_date;
+
+data BTDATA9 (drop=serno);
+set BTDATA8;
+
+
+/* proc sql; */
+/* select count(distinct(caccserno)) as cnt, count(caccserno) as cntr from BTDATA7; */
+/*  */
+/* Proc sql; */
+/* select sum(input(originalamount,10.))/10000000 from BTDATA8; */
+/* quit; */
+
+/*CLI  */
+
+
+/* KOREAI Method */
+proc sql;
+create table cli_proactive_koreai as
+select ROWSERNO, USERNAME, DATETIMESTAMP, NEWVALUE, OLDVALUE
+from prime.TCTDBS_APPLOG a
+where DATETIMESTAMP=(select max(DATETIMESTAMP) from Prime.TCTDBS_APPLOG b 
+where tabname = 'caccounts' and 
+colname = 'creditlimit' and 
+newvalue>oldvalue and 
+username = 'IDFCBANK\MuleprimeprodUAT' and 
+REQUESTORID = 'KOREAI' and 
+a.rowserno = b.rowserno);
+quit;
+
+
+/* NOTE: Table WORK.CLI_PROACTIVE_KOREAI1 created, with 265875 rows and 5 columns. */
+
+proc sql;
+create table cli_koreai as
+select a.*, ca.stgeneral, ca.product, pd.shortcode, pd.name
+from CLI_PROACTIVE_KOREAI a
+left join prime.TCTDBS_CACCOUNTS ca
+on a.rowserno = ca.serno
+left join prime.TCTDBS_PRODUCTS pd
+on ca.product = pd.serno;
+quit;
+/* NOTE: Table WORK.CLI_KOREAI created, with 265875 rows and 9 columns. */
+
+data cli_koreai1;
+set cli_koreai;
+where input(oldvalue,10.) > 10000 and 
+stgeneral not in ("AOWO","BLCK","CHOF","CLBB","CLCC","CLSB",
+"CLSC","CLSD","CLSS","CRWO","CWOF","FATB","FHRD","FSFT",
+"MNPA","NOAU","NPAR","PBIF","PCLS","PSWC","RTOB","SOFR") and
+name not in ("FIRST WOW!") and
+input(newvalue,10.) > input(oldvalue,10.);
+run;
+/* NOTE: The data set WORK.CLI_KOREAI1 has 260699 observations and 9 variables. */
+
+
+/* -------------------------------------------------------------------------------- */
+
+/* CONGOAI Method */
+proc sql;
+create table cli_proactive_congoai as
+select ROWSERNO, USERNAME, DATETIMESTAMP, NEWVALUE, OLDVALUE
+from prime.TCTDBS_APPLOG a
+where DATETIMESTAMP=(select max(DATETIMESTAMP) from Prime.TCTDBS_APPLOG b 
+where tabname = 'caccounts' and 
+colname = 'creditlimit' and 
+newvalue>oldvalue and 
+username = 'IDFCBANK\MuleprimeprodUAT' and 
+REQUESTORID = 'CognoAI' and 
+a.rowserno = b.rowserno);
+quit;
+
+
+/* NOTE: Table WORK.CLI_PROACTIVE_CONGOAI1 created, with 265875 rows and 5 columns. */
+
+proc sql;
+create table cli_congoai as
+select a.*, ca.stgeneral, ca.product, pd.shortcode, pd.name
+from cli_proactive_congoai a
+left join prime.TCTDBS_CACCOUNTS ca
+on a.rowserno = ca.serno
+left join prime.TCTDBS_PRODUCTS pd
+on ca.product = pd.serno;
+quit;
+/* NOTE: Table WORK.CLI_CONGOAI created, with 265875 rows and 9 columns. */
+
+data cli_congoai1;
+set cli_congoai;
+where input(oldvalue,10.) > 10000 and 
+stgeneral not in ("AOWO","BLCK","CHOF","CLBB","CLCC","CLSB",
+"CLSC","CLSD","CLSS","CRWO","CWOF","FATB","FHRD","FSFT",
+"MNPA","NOAU","NPAR","PBIF","PCLS","PSWC","RTOB","SOFR") and
+name not in ("FIRST WOW!") and
+input(newvalue,10.) > input(oldvalue,10.);
+run;
+/*'IDFCBANK\MuleprimeprodUAT'),lit('IVR'))  */
+
+
+
+
+
+/* SFDC Method */
+proc sql;
+create table cli_proactive_sfdc as
+select ROWSERNO, USERNAME, DATETIMESTAMP, NEWVALUE, OLDVALUE
+from prime.TCTDBS_APPLOG a
+where DATETIMESTAMP=(select max(DATETIMESTAMP) from prime.TCTDBS_APPLOG b 
+where tabname = 'caccounts' and 
+colname = 'creditlimit' and 
+newvalue>oldvalue and 
+username = 'IDFCBANK\MuleprimeprodUAT' and 
+REQUESTORID = 'SFDC' and 
+a.rowserno = b.rowserno);
+quit;
+/* NOTE: Table WORK.CLI_PROACTIVE_SFDC created, with 15932 rows and 5 columns. */
+ 
+proc sql;
+create table cli_sfdc as
+select a.*, ca.stgeneral, ca.product, pd.shortcode, pd.name
+from CLI_PROACTIVE_SFDC a
+left join prime.TCTDBS_CACCOUNTS ca
+on a.rowserno = ca.serno
+left join prime.TCTDBS_PRODUCTS pd
+on ca.product = pd.serno;
+quit;
+/* NOTE: Table WORK.CLI_SFDC created, with 15932 rows and 9 columns. */
+
+data cli_sfdc1;
+set cli_sfdc;
+where input(oldvalue,10.) > 10000 and 
+stgeneral not in ("AOWO","BLCK","CHOF","CLBB","CLCC","CLSB",
+"CLSC","CLSD","CLSS","CRWO","CWOF","FATB","FHRD","FSFT",
+"MNPA","NOAU","NPAR","PBIF","PCLS","PSWC","RTOB","SOFR") and
+name not in ("FIRST WOW!") and
+input(newvalue,10.) > input(oldvalue,10.);
+run;
+/* NOTE: The data set WORK.CLI_SFDC1 has 15920 observations and 9 variables. */
+
+
+/* -------------------------------------------------------------------------------- */
+
+/* SMS Method */
+proc sql;
+create table cli_proactive_sms as
+select ROWSERNO, USERNAME, DATETIMESTAMP, NEWVALUE, OLDVALUE
+from prime.TCTDBS_APPLOG a
+where DATETIMESTAMP=(select max(DATETIMESTAMP) from prime.TCTDBS_APPLOG b
+where tabname = 'caccounts' and
+colname = 'creditlimit' and 
+newvalue>oldvalue and 
+username like 'PRM%' and
+a.rowserno = b.rowserno);
+quit;
+/* NOTE: Table WORK.CLI_PROACTIVE_SMS created, with 11212 rows and 5 columns. */
+
+proc sql;
+create table cli_sms as
+select a.*, ca.stgeneral, ca.product, pd.shortcode, pd.name
+from CLI_PROACTIVE_SMS a
+left join prime.TCTDBS_CACCOUNTS ca
+on a.rowserno = ca.serno
+left join prime.TCTDBS_PRODUCTS pd
+on ca.product = pd.serno;
+quit;
+/* NOTE: Table WORK.CLI_SMS created, with 11212 rows and 9 columns. */
+
+data cli_sms1;
+set cli_sms;
+where input(oldvalue,10.) > 10000 and 
+stgeneral not in ("AOWO","BLCK","CHOF","CLBB","CLCC","CLSB",
+"CLSC","CLSD","CLSS","CRWO","CWOF","FATB","FHRD","FSFT",
+"MNPA","NOAU","NPAR","PBIF","PCLS","PSWC","RTOB","SOFR") and
+name not in ("FIRST WOW!") and
+input(newvalue,10.) > input(oldvalue,10.);
+run;
+/* NOTE: The data set WORK.CLI_SMS1 has 8636 observations and 9 variables. */
+
+
+/* -------------------------------------------------------------------------------- */
+
+
+
+data cli_data;
+set CLI_KOREAI1 CLI_SFDC1 CLI_SMS1 cli_congoai1;
+run;
+
+data cli_data1;
+set cli_data;
+format TRXNDATE date9.;
+caccserno=rowserno;
+TRXNDATE =input(DATETIMESTAMP,anydtdte10.);
+originalamount = put(input(newvalue, 10.)- input(oldvalue,10.), 10.);
+creationdate = DATETIMESTAMP;
+/* where  input(DATETIMESTAMP, yymmdd10.) < '01MAR2025'd; */
+blbu_new= "cli";
+live=1;
+run;
+
+
+
+
+data clidata2 (keep= caccserno originalamount TRXNDATE blbu_new creationdate live);
+set  cli_data1;
+
+
+
+data post_acq;
+set BTDATA9 clidata2 emi_tran;
+
+proc freq data = post_acq;
+tables blbu_new * live/norow nocol nopercent;
+
+proc freq data = post_acq;
+tables blbu_new;
+where '31May2025'd< TRXNDATE <'01Jul2025'd;
+
+
+/*ExtractData Here in excel  */
+
+proc sql;
+create table Post_acq1 as 
+select blbu_new, count(caccserno) as cnt, sum(input(originalamount,10.))/10000000 as orgamt,sum(input(originalamount,10.))/count(caccserno) as avg 
+from post_acq
+where '31May2025'd< TRXNDATE <'01Jul2025'd
+group by blbu_new;
+
+
+/*CODE for 6m3mandx+  */
+
+
+
+data emi_tran1;
+set emi_tran;
+
+proc freq data = emi_tran1;
+tables blbu_new;
+
+
+proc sql;
+create table emi_tran2 as
+select * from emi_tran1
+where live = 1;
+quit;
+
+
+proc freq data = emi_tran2;
+tables blbu_new;
+
+
+/*MercEMI  */
+data Merc_emi_tran2;
+set emi_tran2;
+where blbu_new = 'Merc_EMI';
+
+proc sql;
+create table Merc_emi_tran2min as select caccserno,
+min(TRXNDATE) format = DATE9. as first,
+count(*) as count
+from Merc_emi_tran2
+group by caccserno;
+quit;
+
+Data Merc_emi_tran2min;
+set Merc_emi_tran2min;
+if count> 1 then MULTIPLE= 1;
+else MULTIPLE=0;
+run;
+
+proc sql;
+create table Merc_emi_tran2min1 as
+select a.*, b.MULTIPLE, first
+from Merc_emi_tran2 a
+left join Merc_emi_tran2min b
+on a.caccserno=b.caccserno;
+quit;
+
+data Merc_emi_tran2min1;
+set Merc_emi_tran2min1;
+format first MONYY.;
+run;
+
+data Merc_emi_tran2min2;
+set Merc_emi_tran2min1;
+if first = TRXNDATE then first_time=1;
+else first_time=0;
+run;
+
+proc freq data = Merc_emi_tran2min2;
+tables blbu_new * live/nocol norow nopercent;
+
+data Merc_emi_tran2min2;
+set Merc_emi_tran2min1;
+format amt 20.;
+amt = originalamount*1;
+caccserno1=caccserno*1;
+run;
+
+
+
+/*TranEMI  */
+data Tran_emi_tran2;
+set emi_tran2;
+where blbu_new = 'Trxn_EMI';
+
+proc sql;
+create table Tran_emi_tran2min as select caccserno,
+min(TRXNDATE) format = DATE9. as first,
+count(*) as count
+from Tran_emi_tran2
+group by caccserno;
+quit;
+
+Data Tran_emi_tran2min;
+set Tran_emi_tran2min;
+if count> 1 then MULTIPLE= 1;
+else MULTIPLE=0;
+run;
+
+proc sql;
+create table Tran_emi_tran2min1 as
+select a.*, b.MULTIPLE, first
+from Tran_emi_tran2 a
+left join Tran_emi_tran2min b
+on a.caccserno=b.caccserno;
+quit;
+
+data Tran_emi_tran2min1;
+set Tran_emi_tran2min1;
+format first MONYY.;
+run;
+
+data Tran_emi_tran2min2;
+set Tran_emi_tran2min1;
+if first = TRXNDATE then first_time=1;
+else first_time=0;
+run;
+
+proc freq data = Tran_emi_tran2min2;
+tables blbu_new * live/nocol norow nopercent;
+
+data Tran_emi_tran2min2;
+set Tran_emi_tran2min1;
+format amt 20.;
+amt = originalamount*1;
+caccserno1=caccserno*1;
+run;
+
+
+/*Balcon  */
+data balcon_emi_tran2;
+set emi_tran2;
+where blbu_new = 'Balnc_con';
+
+proc sql;
+create table balcon_emi_tran2min as select caccserno,
+min(TRXNDATE) format = DATE9. as first,
+count(*) as count
+from balcon_emi_tran2
+group by caccserno;
+quit;
+
+Data balcon_emi_tran2min;
+set balcon_emi_tran2min;
+if count> 1 then MULTIPLE= 1;
+else MULTIPLE=0;
+run;
+
+proc sql;
+create table balcon_emi_tran2min1 as
+select a.*, b.MULTIPLE, first
+from balcon_emi_tran2 a
+left join balcon_emi_tran2min b
+on a.caccserno=b.caccserno;
+quit;
+
+data balcon_emi_tran2min1;
+set balcon_emi_tran2min1;
+format first MONYY.;
+run;
+
+data balcon_emi_tran2min2;
+set balcon_emi_tran2min1;
+if first = TRXNDATE then first_time=1;
+else first_time=0;
+run;
+
+proc freq data = balcon_emi_tran2min2;
+tables blbu_new * live/nocol norow nopercent;
+
+data balcon_emi_tran2min2;
+set balcon_emi_tran2min1;
+format amt 20.;
+amt = originalamount*1;
+caccserno1=caccserno*1;
+run;
+
+/*OTL  */
+data otl_emi_tran2;
+set emi_tran2;
+where blbu_new = 'OTL';
+
+proc sql;
+create table otl_emi_tran2min as select caccserno,
+min(TRXNDATE) format = DATE9. as first,
+count(*) as count
+from otl_emi_tran2
+group by caccserno;
+quit;
+
+Data otl_emi_tran2min;
+set otl_emi_tran2min;
+if count> 1 then MULTIPLE= 1;
+else MULTIPLE=0;
+run;
+
+proc sql;
+create table otl_emi_tran2min1 as
+select a.*, b.MULTIPLE, first
+from otl_emi_tran2 a
+left join otl_emi_tran2min b
+on a.caccserno=b.caccserno;
+quit;
+
+data otl_emi_tran2min1;
+set otl_emi_tran2min1;
+format first MONYY.;
+run;
+
+data otl_emi_tran2min2;
+set otl_emi_tran2min1;
+if first = TRXNDATE then first_time=1;
+else first_time=0;
+run;
+
+proc freq data = otl_emi_tran2min2;
+tables blbu_new * live/nocol norow nopercent;
+
+data otl_emi_tran2min2;
+set otl_emi_tran2min1;
+format amt 20.;
+amt = originalamount*1;
+caccserno1=caccserno*1;
+run;
+
+/*WTL  */
+data wtl_emi_tran2;
+set emi_tran2;
+where blbu_new = 'WTL';
+
+proc sql;
+create table wtl_emi_tran2min as select caccserno,
+min(TRXNDATE) format = DATE9. as first,
+count(*) as count
+from wtl_emi_tran2
+group by caccserno;
+quit;
+
+Data wtl_emi_tran2min;
+set wtl_emi_tran2min;
+if count> 1 then MULTIPLE= 1;
+else MULTIPLE=0;
+run;
+
+proc sql;
+create table wtl_emi_tran2min1 as
+select a.*, b.MULTIPLE, first
+from wtl_emi_tran2 a
+left join wtl_emi_tran2min b
+on a.caccserno=b.caccserno;
+quit;
+
+data wtl_emi_tran2min1;
+set wtl_emi_tran2min1;
+format first MONYY.;
+run;
+
+data wtl_emi_tran2min2;
+set wtl_emi_tran2min1;
+if first = TRXNDATE then first_time=1;
+else first_time=0;
+run;
+
+proc freq data = wtl_emi_tran2min2;
+tables blbu_new * live/nocol norow nopercent;
+
+data wtl_emi_tran2min2;
+set wtl_emi_tran2min1;
+format amt 20.;
+amt = originalamount*1;
+caccserno1=caccserno*1;
+run;
+
+data emi_perf;
+set wtl_emi_tran2min2 otl_emi_tran2min2 balcon_emi_tran2min2 tran_emi_tran2min2 merc_emi_tran2min2;
+
+
+
+data pfmar25(keep=caccserno overduecycles cyc_overduecycles balance instalmentbalance /*change date */
+mo_good_bal cyc_good_bal) ;
+set cc.PORTFOLIO_DATA_202503;   /*change date */
+Run;
+
+
+
+
+proc sql;
+create table emi_perf2 as 
+select a.*,b.overduecycles, b.cyc_overduecycles, 
+b.balance, b.instalmentbalance, b.mo_good_bal
+from emi_perf a
+left join pfmar25 b         /* change date */
+on input(a.caccserno,10.)=b.caccserno;
+Quit;
+
+data emi_perf3; 
+set emi_perf2;
+format cur_month date9.;
+cur_month =input('01Mar2025',anydtdte10.);          /* change month here */
+run;
+
+
+data emi_perf4;
+set emi_perf3;
+format cur_month MONYY.;
+cur_month = cur_month;
+run;
+
+DATA emi_perf5;
+SET emi_perf4;
+months_diff=intck("month", first,cur_month);
+RUN;
+
+
+
+proc sql;
+create table emi_performance_final as 
+select distinct caccserno, first,blbu_new,
+max(overduecycles) as overduecycles,
+max(cyc_overduecycles) as cyc_overduecycles, 
+max(input(balance,10.)) as balance,
+max(instalmentbalance) as instalmentbalance,
+max(mo_good_bal) as mo_good_bal,
+cur_month, months_diff
+from emi_perf5
+group by caccserno, blbu_new;
+Quit;
+
+
+/*cli  */
+
+data cli_emi_tran2;
+set clidata2;
+
+
+
+proc sql;
+Create table new as 
+select distinct a.*, b.peopleserno,b.accountopenmonth
+from  cli_emi_tran2 as a 
+left join  rajendra.portfolio_data_202506 as b
+on input(a.caccserno,10.) = b.caccserno;
+
+
+
+/* proc sql; */
+/* Create table new as  */
+/* select distinct a.*, b.caccserno as rowserno, b.accountopenmonth */
+/* from  import as a  */
+/* left join  rajendra.portfolio_data_202505 as b */
+/* on a.peopleserno = input(b.peopleserno,10.); */
+
+proc sort data = new out=new1;
+by peopleserno accountopenmonth;
+run;
+
+
+data new2;
+set new1;
+by peopleserno;
+if last.peopleserno then n=1;
+else n+1;
+
+
+data new3;
+set new2;
+where n =1;
+
+
+/* proc sql; */
+/* create table cli_emi_tran3 as */
+/* select distinct * from cli_emi_tran2 */
+/* where input(caccserno,10.) not in ( select rowserno from new3); */
+
+
+data cli_emi_tran4;
+set new3;
+format TRXNDATE date9.;
+TRXNDATE =input(creationdate,anydtdte10.);
+run;
+/* NOTE: The data set WORK.CLI_DATA1 has 555275 observations and 10 variables. */
+
+data cli_emi_tran5;
+set cli_emi_tran4;
+format TRXNMNTH MONYY.;
+TRXNMNTH = TRXNDATE;
+run;
+/* NOTE: The data set WORK.CLI_DATA1 has 285255 observations and 11 variables. */
+
+data cli_emi_tran6;
+set cli_emi_tran5;
+trxndate=input(creationdate,anydtdte10.);
+m=month(trxndate);
+y=year(trxndate);
+if m=1 then m1='01';
+else if m=2 then m1='02';
+else if m=3 then m1='03';
+else if m=4 then m1='04';
+else if m=5 then m1='05';
+else if m=6 then m1='06';
+else if m=7 then m1='07';
+else if m=8 then m1='08';
+else if m=9 then m1='09';
+else m1=m;
+trxnmnth1 = cat(y,m1);
+run;
+
+
+
+
+data pfjun25(keep=caccserno overduecycles cyc_overduecycles balance instalmentbalance
+mo_good_bal cyc_good_bal) ;
+set rajendra.portfolio_data_202506;
+Run;
+
+proc sql;
+create table cli_emi_tran7 as 
+select caccserno, TRXNMNTH
+from cli_emi_tran6;
+Quit;
+
+proc sql;
+create table cli_emi_tran8 as 
+select a.*,b.overduecycles, b.cyc_overduecycles, 
+b.balance, b.instalmentbalance, b.mo_good_bal 
+from cli_emi_tran7 a
+left join pfjun25 b
+on input(a.caccserno, 10.)= b.caccserno;
+Quit;
+
+data cli_emi_tran9; 
+set cli_emi_tran8;
+format cur_month date9.;
+cur_month =input('01Jun2025',anydtdte10.);          /* change month here */
+run;
+
+data cli_emi_tran10;
+set cli_emi_tran9;
+format cur_month MONYY.;
+cur_month = cur_month;
+run;
+
+DATA cli_emi_tran9;
+SET cli_emi_tran9;
+months_diff=intck("month", trxnmnth,cur_month);
+RUN;
+
+proc sql;
+create table cli_summary AS select distinct caccserno, trxnmnth,
+max(overduecycles) as overduecycles,
+max(cyc_overduecycles) as cyc_overduecycles, 
+max(input(balance,10.)) as balance,
+max(instalmentbalance) as instalmentbalance,
+max(mo_good_bal) as mo_good_bal,
+cur_month, months_diff
+from cli_emi_tran9
+group by caccserno;
+Quit;
+
+
+/* EverBt */
+
+data BT_tran2;
+set BTDATA9;
+
+proc freq data = BT_tran2;
+tables TRXNDATE;
+
+
+
+proc sql;
+create table BT_emi_tran2min as select caccserno,
+min(TRXNDATE) format = DATE9. as first,
+count(*) as count
+from BT_tran2
+group by caccserno;
+quit;
+
+Data BT_emi_tran2min;
+set BT_emi_tran2min;
+if count> 1 then MULTIPLE= 1;
+else MULTIPLE=0;
+run;
+
+proc sql;
+create table BT_emi_tran2min1 as
+select a.*, b.MULTIPLE, first
+from BT_tran2 a
+left join BT_emi_tran2min b
+on a.caccserno=b.caccserno;
+quit;
+
+data BT_emi_tran2min1;
+set BT_emi_tran2min1;
+format first MONYY.;
+run;
+
+data BT_emi_tran2min2;
+set BT_emi_tran2min1;
+if first = TRXNDATE then first_time=1;
+else first_time=0;
+run;
+
+proc freq data = BT_emi_tran2min2;
+tables blbu_new * live/nocol norow nopercent;
+
+data BT_emi_tran2min3;
+set BT_emi_tran2min2;
+format amt 20.;
+amt = originalamount*1;
+caccserno1=caccserno*1;
+run;
+
+
+data pfjun25(keep=caccserno overduecycles cyc_overduecycles balance instalmentbalance
+mo_good_bal cyc_good_bal) ;
+set rajendra.portfolio_data_202506;
+Run;
+
+proc sql;
+create table bt_emi_tran7 as 
+select caccserno, TRXNDATE
+from BT_emi_tran2min3;
+Quit;
+
+proc sql;
+create table bt_emi_tran8 as 
+select a.*,b.overduecycles, b.cyc_overduecycles, 
+b.balance, b.instalmentbalance, b.mo_good_bal 
+from bt_emi_tran7 a
+left join pfjun25 b
+on input(a.caccserno, 10.)= b.caccserno;
+Quit;
+
+data bt_emi_tran9; 
+set bt_emi_tran8;
+format cur_month date9.;
+cur_month =input('01Jun2025',anydtdte10.);          /* change month here */
+run;
+
+data bt_emi_tran10;
+set bt_emi_tran9;
+format cur_month MONYY.;
+cur_month = cur_month;
+
+data bt_emi_tran11;
+set bt_emi_tran10;
+format TRXNMNTH MONYY.;
+TRXNMNTH = TRXNDATE;
+run;
+
+DATA bt_emi_tran12;
+SET bt_emi_tran11;
+months_diff=intck("month", trxnmnth,cur_month);
+RUN;
+
+proc sql;
+create table bt_summary AS select distinct caccserno, trxnmnth,
+max(overduecycles) as overduecycles,
+max(cyc_overduecycles) as cyc_overduecycles, 
+max(input(balance,10.)) as balance,
+max(instalmentbalance) as instalmentbalance,
+max(mo_good_bal) as mo_good_bal,
+cur_month, months_diff
+from bt_emi_tran12
+group by caccserno;
+Quit;
+
+/*  */
+/* proc sql; */
+/* create table cli_emi_tran2min as select caccserno, */
+/* min(TRXNDATE) format = DATE9. as first, */
+/* count(*) as count */
+/* from cli_emi_tran2 */
+/* group by caccserno; */
+/* quit; */
+/*  */
+/* Data wtl_emi_tran2min; */
+/* set wtl_emi_tran2min; */
+/* if count> 1 then MULTIPLE= 1; */
+/* else MULTIPLE=0; */
+/* run; */
+/*  */
+/* proc sql; */
+/* create table wtl_emi_tran2min1 as */
+/* select a.*, b.MULTIPLE, first */
+/* from wtl_emi_tran2 a */
+/* left join wtl_emi_tran2min b */
+/* on a.caccserno=b.caccserno; */
+/* quit; */
+/*  */
+/* data wtl_emi_tran2min1; */
+/* set wtl_emi_tran2min1; */
+/* format first MONYY.; */
+/* run; */
+/*  */
+/* data wtl_emi_tran2min2; */
+/* set wtl_emi_tran2min1; */
+/* if first = TRXNDATE then first_time=1; */
+/* else first_time=0; */
+/* run; */
+/*  */
+/* proc freq data = wtl_emi_tran2min2; */
+/* tables blbu_new * live/nocol norow nopercent; */
+/*  */
+/* data wtl_emi_tran2min2; */
+/* set wtl_emi_tran2min1; */
+/* format amt 20.; */
+/* amt = originalamount*1; */
+/* caccserno1=caccserno*1; */
+/* run; */
+/*  */
+/*  */
+/* proc sql; */
+/* select count(distinct(caccserno)) as dist, count(caccserno) as cnt, blbu_new from post_acq */
+/* group by blbu_new ; */
+/*  */
+/*  */
+/*  */
+/* data wtl; */
+/* set post_acq; */
+/* where blbu_new ='WTL'; */
+/*  */
+/*  */
+/* proc sql; */
+/* create table wtl2 as */
+/* select * from wtl */
+/* where live = 1; */
+/* quit; */
+/*  */
+/* proc sql; */
+/* create table min as select caccserno, */
+/* min(TRXNDATE) format = DATE9. as first, */
+/* count(*) as count */
+/* from wtl2 */
+/* group by caccserno; */
+/* quit; */
+/*  */
+/*  */
+/* Data min; */
+/* set min; */
+/* if count> 1 then MULTIPLE= 1; */
+/* else MULTIPLE=0; */
+/* run; */
+/*  */
+/*  */
+/* proc sql; */
+/* create table post_data as */
+/* select a.*, b.MULTIPLE, first */
+/* from wtl2 a */
+/* left join min b */
+/* on a.caccserno=b.caccserno; */
+/* quit; */
+/*  */
+/*  */
+/* data post_data1; */
+/* set post_data; */
+/* format first MONYY.; */
+/* run; */
+/*  */
+/* data post_data2; */
+/* set post_data1; */
+/* if first = TRXNDATE then first_time=1; */
+/* else first_time=0; */
+/* run; */
+/*  */
+/* proc freq data = post_data2; */
+/* tables first_time; */
+/*  */
+/* data post_data3; */
+/* set post_data2; */
+/* format amt 20.; */
+/* amt = originalamount*1; */
+/* caccserno1=caccserno*1; */
+/* run; */
+/*  */
+/*  */
+/*  */
+/* data pffeb25(keep=caccserno overduecycles cyc_overduecycles balance instalmentbalance /*change date */
+/* mo_good_bal cyc_good_bal) ; */
+/* set cc.PORTFOLIO_DATA_202502;   /*change date */
+/* Run; */
+/*  */
+/*  */
+/*  */
+/*  */
+/* proc sql; */
+/* create table post_portfolio as  */
+/* select a.*,b.overduecycles, b.cyc_overduecycles,  */
+/* b.balance, b.instalmentbalance, b.mo_good_bal */
+/* from post_data3 a */
+/* left join pffeb25 b         /* change date */
+/* on input(a.caccserno,10.)=b.caccserno; */
+/* Quit; */
+/*  */
+/* data post_portfolio1;  */
+/* set post_portfolio; */
+/* format cur_month date9.; */
+/* cur_month =input('01Feb2025',anydtdte10.);          /* change month here */
+/* run; */
+/*  */
+/* data post_portfolio1; */
+/* set post_portfolio1; */
+/* format cur_month MONYY.; */
+/* cur_month = cur_month; */
+/* run; */
+/*  */
+/* DATA post_portfolio2; */
+/* SET post_portfolio1; */
+/* months_diff=intck("month", first,cur_month); */
+/* RUN; */
+/*  */
+/*  */
+/*  */
+/* proc sql; */
+/* create table live_summary as  */
+/* select distinct caccserno, first,blbu_new, */
+/* max(overduecycles) as overduecycles, */
+/* max(cyc_overduecycles) as cyc_overduecycles,  */
+/* max(input(balance,10.)) as balance, */
+/* max(instalmentbalance) as instalmentbalance, */
+/* max(mo_good_bal) as mo_good_bal, */
+/* cur_month, months_diff */
+/* from post_portfolio2 */
+/* group by caccserno, blbu_new; */
+/* Quit; */
+/*  */
+/*  */
+/* proc sql; */
+/* create table port_enr as */
+/* select overduecycles, sum(balance,instalmentbalance ) as enr, caccserno, instalmentbalance as loanenr */
+/* from live_summary */
+/* where first  <'01Mar2025'd and overduecycles < 7; */
+/*  */
+/* proc freq data= port_enr; */
+/* tables overduecycles * enr /nocol norow nopercent; */
+/*  */
+/* proc sql; */
+/* create table nb as  */
+/* select * from PERF_V2 */
+/* where blbu_new = 'Merc_EM' and overduecycles < 7 and TRXNDATE  <'01Mar2025'd and months_diff =6; */
+/*  */
+/*  */
+/*  */
+/* proc freq data= live__summary; */
+/* tables blbu_new; */
+/* where  '31Jan2025'd< TRXNDATE <'01Mar2025'd; */
+/*  */
+
+ttn-----
+
+
+Options compress=yes;
+libname aneesha "/Policy/aneesha.choudhary";
+libname cdw '/BIUSASDATA/BIUDATANAS/Rahul Dasgupta/cdw'; 
+libname charan "/PolicyNew/"; 
+libname Madhuri '/BIUSASDATA/BIUDATANAS/Madhuri Chhabra'; 
+libname shpravee '/Policy/PraveenSingh'; 
+libname rajendra "/Policy/rajendra.bhoir";
+libname ct "/Policy/charanteja.beemanapalli";
+
+data ever_emi_data (keep = merchid merchname merchtype 
+outstinstamount overdueamount serno 
+caccserno originalamount outstprincipalamount 
+creationdate instalmentsnumber interestrate 
+status trxndescription instalmentplanserno);
+set prime.tctdbs_cinstalments;
+Run;
+
+data E1ConsolData1;
+set ever_emi_data;
+if outstinstamount>0 then live_wtl=1;
+else live_wtl=0;
+if instalmentplanserno in (642,644,646,648,650,652,654,656,658,660,524,562) 
+then wtl = 1; else wtl = 0;
+Run;
+
+
+proc sql;
+create table E1Consoldata2 as
+select * from E1CONSOLDATA1
+where wtl = 1 and status in ("NORM", "PAID");
+quit;
+
+proc sql;
+select count(distinct caccserno) from E1CONSOLDATA2
+where creationdate not like '2025-05%';
+quit;
+
+
+/* Total accounts availed wTL as of month */
+
+data wtl ;
+set E1CONSOLDATA2;
+format ccreate_date yymmn10.;
+informat ccreate_date yymmdd10.;
+ccreate_date = input(creationdate,yymmdd10.);
+run;
+
+proc freq data = wtl;
+tables ccreate_date;
+
+data wtl1;
+set wtl;
+where '01Nov2024'd <= ccreate_date < '01May2025'd ;
+
+
+
+proc sql;
+create table wtl4 as
+select distinct a.*, b.dob, b.crn
+from wtl1 as a
+left join PS_OLD.ACQ_MASTER_Apr25 as b 
+on input(a.caccserno,10.)= b.caccserno;
+
+proc freq data =wtl4;
+tables dob; 
+
+data wtl5;
+set wtl4;
+format bday yymmdd10.;
+informat bday yymmdd10.;
+bday =dob;
+
+
+data wtl6(drop= dob bday );
+set wtl5;
+age  = intck ('YEAR', bday, ccreate_date);
+
+data wtl91;
+set wtl6;
+date= input(put(ccreate_date,yymmn6.),8.);
+
+
+
+/*sep  */
+proc freq data = wtl91;
+tables ccreate_date;
+
+proc sql;
+create table sep_per as 
+select * from wtl91 
+where date = 202503;
+
+
+data pfaug24(keep= caccserno creditlimit  mo_good_bal peopleserno) ; 
+set cc.PORTFOLIO_DATA_202502;   /*change date */
+Run;
+
+proc sql;
+create table sep2 as 
+select a.*, b.peopleserno
+from sep_per a
+left join pfaug24 b         /* change date */
+on input(a.caccserno,10.)=b.caccserno;
+Quit;
+
+/*oct  */
+
+proc freq data = wtl91;
+tables ccreate_date;
+
+proc sql;
+create table oct_per as 
+select * from wtl91 
+where date = 202504;
+
+
+data pfsep24(keep= caccserno creditlimit  mo_good_bal peopleserno ) ; 
+set cc.PORTFOLIO_DATA_202403;   /*change date */
+Run;
+
+proc sql;
+create table oct2 as 
+select a.*, b.creditlimit,  b.mo_good_bal,b.peopleserno
+from oct_per a
+left join pfsep24 b         /* change date */
+on input(a.caccserno,10.)=b.caccserno;
+Quit;
+
+/*Nov24  */
+
+
+proc sql;
+create table nov_per as 
+select * from wtl91 
+where date = 202411;
+
+
+data pfoct24(keep= caccserno creditlimit  mo_good_bal peopleserno ) ; 
+set cc.PORTFOLIO_DATA_202410;   /*change date */
+Run;
+
+proc sql;
+create table nov2 as 
+select a.*, b.creditlimit,  b.mo_good_bal,b.peopleserno
+from nov_per a
+left join pfoct24 b         /* change date */
+on input(a.caccserno,10.)=b.caccserno;
+Quit;
+
+/*dec  */
+
+proc sql;
+create table dec_per as 
+select * from wtl91 
+where date = 202412;
+
+
+data pfnov24(keep= caccserno creditlimit  mo_good_bal peopleserno) ; 
+set cc.PORTFOLIO_DATA_202411;   /*change date */
+Run;
+
+proc sql;
+create table dec2 as 
+select a.*, b.creditlimit,  b.mo_good_bal,b.peopleserno
+from dec_per a
+left join pfnov24 b         /* change date */
+on input(a.caccserno,10.)=b.caccserno;
+Quit;
+
+/*jan  */
+
+proc sql;
+create table jan_per as 
+select * from wtl91 
+where date = 202501;
+
+
+data pfdec24(keep= caccserno creditlimit  mo_good_bal peopleserno) ; 
+set cc.PORTFOLIO_DATA_202412;   /*change date */
+Run;
+
+proc sql;
+create table jan2 as 
+select a.*, b.creditlimit,  b.mo_good_bal,b.peopleserno
+from jan_per a
+left join pfdec24 b         /* change date */
+on input(a.caccserno,10.)=b.caccserno;
+Quit;
+
+
+
+/*jan  */
+
+proc sql;
+create table feb_per as 
+select * from wtl91 
+where date = 202502;
+
+
+data pfjan25(keep= caccserno creditlimit  mo_good_bal peopleserno) ; 
+set cc.PORTFOLIO_DATA_202501;   /*change date */
+Run;
+
+proc sql;
+create table feb2 as 
+select a.*, b.creditlimit,  b.mo_good_bal,b.peopleserno
+from feb_per a
+left join pfjan25 b         /* change date */
+on input(a.caccserno,10.)=b.caccserno;
+Quit;
+
+
+
+data wtl91_final;
+set  sep2 oct2 nov2 dec2 jan2 feb2;
+
+
+proc freq data = wtl91_final;
+tables date;
+
+
+/*202411	3521	6.38	38808	70.37
+202412	3536	6.41	42344	76.78
+202501	3032	5.50	45376	82.28
+202502	2693	4.88	48069	87.16
+202503	2990	5.42	51059	92.58
+202504	2603	4.72	53662	97.30
+202505	1487	2.70	55149	100.00
+  */
+
+
+/*Bscore  */
+
+
+/*July  */
+/*  */
+/* data bscore_jul24; */
+/* set rajendra.BSCORE_JUL24_RE; */
+/* 	 if decile =   9      then risk_band = "Very High"; */
+/* else if decile in (7,8)   then risk_band = "High"; */
+/* else if decile in (4,5,6) then risk_band = "Medium"; */
+/* else if decile in (2,3)   then risk_band = "Low"; */
+/* else if decile in (0,1)   then risk_band = "Very Low"; */
+/* else if missing(decile)   then risk_band = "NA"; */
+/* run; */
+/*  */
+/* proc sql; */
+/* create table Risk_deck_ppd_jul24ODC_BASE1 as  */
+/* select distinct a.*, */
+/* 				b.risk_band as risk_band_jul24  */
+/* 				 */
+/* from wtl91_final a */
+/* left join bscore_jul24 b */
+/* on input(a.peopleserno,10.) = b.peopleserno; */
+/* Quit; */
+/*  */
+/*  */
+/* data PERF_JUL24ODC_BASE2; */
+/* set rajendra.BSCORE_JUL24_DS; */
+/* if prob_bad ne '' then risk_band_ds = "Very High+"; */
+/* run; */
+/*  */
+/* proc sql; */
+/* create table PERF_jul24ODC_BASEfinal as  */
+/* select distinct a.*, */
+/* 				b.risk_band_ds as risk_band_ds_jul24 */
+/* from Risk_deck_ppd_jul24ODC_BASE1 a */
+/* left join PERF_JUL24ODC_BASE2 b */
+/* on input(a.peopleserno,10.) = b.peopleserno; */
+/* Quit; */
+/*  */
+/* proc sql; */
+/* create table pdd_jul as */
+/* select a.*, case when risk_band_jul24 = '' then   risk_band_ds_jul24 else risk_band_jul24 */
+/* end as  riskband_jul from PERF_jul24ODC_BASEfinal a; */
+/*  */
+/* data pdd_jul1 (drop=risk_band_ds_jul24 risk_band_jul24 ); */
+/* set pdd_jul; */
+/*  */
+
+
+
+/*AUG24  */
+
+data bscore_aug24;
+set rajendra.BSCORE_AUG24_RE;
+	 if decile =   9      then risk_band = "Very High";
+else if decile in (7,8)   then risk_band = "High";
+else if decile in (4,5,6) then risk_band = "Medium";
+else if decile in (2,3)   then risk_band = "Low";
+else if decile in (0,1)   then risk_band = "Very Low";
+else if missing(decile)   then risk_band = "NA";
+run;
+
+proc sql;
+create table Risk_deck_ppd_aug24ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_aug24 
+				
+from wtl91_final a
+left join bscore_aug24 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+
+data PERF_AUG24ODC_BASE2;
+set rajendra.BSCORE_AUG24_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+
+proc sql;
+create table PERF_aug24ODC_BASEfinal as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_aug24
+from Risk_deck_ppd_aug24ODC_BASE1 a
+left join PERF_AUG24ODC_BASE2 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+proc sql;
+create table pdd_aug as
+select a.*, case when risk_band_aug24 = '' then   risk_band_ds_aug24 else risk_band_aug24
+end as  riskband_aug from PERF_aug24ODC_BASEfinal a;
+
+data pdd_aug1 (drop=risk_band_ds_aug24 risk_band_aug24 );
+set pdd_aug;
+
+/*Sep24  */
+data bscore_sep24;
+set rajendra.BSCORE_SEP24_RE;
+	 if decile =   9      then risk_band = "Very High";
+else if decile in (7,8)   then risk_band = "High";
+else if decile in (4,5,6) then risk_band = "Medium";
+else if decile in (2,3)   then risk_band = "Low";
+else if decile in (0,1)   then risk_band = "Very Low";
+else if missing(decile)   then risk_band = "NA";
+run;
+
+proc sql;
+create table Risk_deck_ppd_sep24ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_sep24 
+				
+from pdd_aug1 a
+left join bscore_sep24 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+
+data PERF_SEP24ODC_BASE2;
+set rajendra.BSCORE_SEP24_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+
+proc sql;
+create table PERF_sep24ODC_BASEfinal as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_sep24
+from Risk_deck_ppd_sep24ODC_BASE1 a
+left join PERF_SEP24ODC_BASE2 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+proc sql;
+create table pdd_sep as
+select a.*, case when risk_band_sep24 = '' then   risk_band_ds_sep24 else risk_band_sep24
+end as  riskband_sep from PERF_sep24ODC_BASEfinal a;
+
+data pdd_sep1 (drop=risk_band_ds_sep24 risk_band_sep24 );
+set pdd_sep;
+
+/*OCT24  */
+data bscore_oct24;
+set rajendra.BSCORE_OCT24_RE;
+	 if decile =   9      then risk_band = "Very High";
+else if decile in (7,8)   then risk_band = "High";
+else if decile in (4,5,6) then risk_band = "Medium";
+else if decile in (2,3)   then risk_band = "Low";
+else if decile in (0,1)   then risk_band = "Very Low";
+else if missing(decile)   then risk_band = "NA";
+run;
+
+proc sql;
+create table Risk_deck_ppd_oct24ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_oct24 
+				
+from pdd_sep1 a
+left join bscore_oct24 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+
+data PERF_OCT24ODC_BASE2;
+set rajendra.BSCORE_OCT24_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+
+proc sql;
+create table PERF_oct24ODC_BASEfinal as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_oct24
+from Risk_deck_ppd_oct24ODC_BASE1 a
+left join PERF_OCT24ODC_BASE2 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+proc sql;
+create table pdd_oct as
+select a.*, case when risk_band_oct24 = '' then   risk_band_ds_oct24 else risk_band_oct24
+end as  riskband_oct from PERF_oct24ODC_BASEfinal a;
+
+data pdd_oct1 (drop=risk_band_ds_oct24 risk_band_oct24 );
+set pdd_oct;
+
+
+/* Nov24 */
+data bscore_nov24;
+set rajendra.BSCORE_NOV24_RE;
+	 if decile =   9      then risk_band = "Very High";
+else if decile in (7,8)   then risk_band = "High";
+else if decile in (4,5,6) then risk_band = "Medium";
+else if decile in (2,3)   then risk_band = "Low";
+else if decile in (0,1)   then risk_band = "Very Low";
+else if missing(decile)   then risk_band = "NA";
+run;
+
+proc sql;
+create table Risk_deck_ppd_nov24ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_nov24 
+				
+from pdd_oct1 a
+left join bscore_nov24 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+
+data PERF_NOV24ODC_BASE2;
+set rajendra.BSCORE_NOV24_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+
+proc sql;
+create table PERF_nov24ODC_BASEfinal as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_nov24
+from Risk_deck_ppd_nov24ODC_BASE1 a
+left join PERF_NOV24ODC_BASE2 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+proc sql;
+create table pdd_nov as
+select a.*, case when risk_band_nov24 = '' then   risk_band_ds_nov24 else risk_band_nov24
+end as  riskband_nov from PERF_nov24ODC_BASEfinal a;
+
+
+data pdd_nov1 (drop=risk_band_ds_nov24 risk_band_nov24 );
+set pdd_nov;
+
+/* Dec24 */
+data bscore_dec24;
+set rajendra.BSCORE_DEC24_RE;
+	 if decile =   9      then risk_band = "Very High";
+else if decile in (7,8)   then risk_band = "High";
+else if decile in (4,5,6) then risk_band = "Medium";
+else if decile in (2,3)   then risk_band = "Low";
+else if decile in (0,1)   then risk_band = "Very Low";
+else if missing(decile)   then risk_band = "NA";
+run;
+
+proc sql;
+create table Risk_deck_ppd_dec24ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_dec24 
+				
+from pdd_nov1 a
+left join bscore_dec24 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+
+data PERF_DEC24ODC_BASE2;
+set rajendra.BSCORE_DEC24_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+
+proc sql;
+create table PERF_dec24ODC_BASEfinal as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_dec24
+from Risk_deck_ppd_dec24ODC_BASE1 a
+left join PERF_DEC24ODC_BASE2 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+proc sql;
+create table pdd_dec as
+select a.*, case when risk_band_dec24 = '' then   risk_band_ds_dec24 else risk_band_dec24
+end as  riskband_dec from PERF_dec24ODC_BASEfinal a;
+
+
+data pdd_dec1 (drop=risk_band_ds_dec24 risk_band_dec24 );
+set pdd_dec;
+
+
+proc freq data = pdd_dec1;
+tables  ccreate_date;
+
+
+/* Jan25 */
+data bscore_jan25;
+set rajendra.BSCORE_JAN25_RE;
+	 if decile =   9      then risk_band = "Very High";
+else if decile in (7,8)   then risk_band = "High";
+else if decile in (4,5,6) then risk_band = "Medium";
+else if decile in (2,3)   then risk_band = "Low";
+else if decile in (0,1)   then risk_band = "Very Low";
+else if missing(decile)   then risk_band = "NA";
+run;
+
+proc sql;
+create table Risk_deck_ppd_jan25ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_jan25 
+				
+from pdd_dec1 a
+left join bscore_jan25 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+
+data PERF_JAN25ODC_BASE2;
+set rajendra.BSCORE_JAN25_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+
+proc sql;
+create table PERF_jan25ODC_BASEfinal as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_jan25
+from Risk_deck_ppd_jan25ODC_BASE1 a
+left join PERF_JAN25ODC_BASE2 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+proc sql;
+create table pdd_jan as
+select a.*, case when risk_band_jan25 = '' then   risk_band_ds_jan25 else risk_band_jan25
+end as  riskband_jan from PERF_jan25ODC_BASEfinal a;
+
+
+data pdd_jan1 (drop=risk_band_ds_jan25 risk_band_jan25 );
+set pdd_jan;
+
+
+/* Feb25 */
+data bscore_feb25;
+set RAJENDRA.BSCORE_FEB25_RE;
+	 if Bscore_Decile in  ('9')      then risk_band = "Very High";
+else if Bscore_Decile in ('7','8')   then risk_band = "High";
+else if Bscore_Decile in ('4','5','6') then risk_band = "Medium";
+else if Bscore_Decile in ('2','3')   then risk_band = "Low";
+else if Bscore_Decile in ('0','1')   then risk_band = "Very Low";
+else if missing(Bscore_Decile)   then risk_band = "NA";
+run;
+
+proc sql;
+create table Risk_deck_ppd_feb25ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_feb25 
+				
+from pdd_jan1 a
+left join bscore_feb25 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+
+data PERF_FEB25ODC_BASE2;
+set RAJENDRA.BSCORE_FEB25_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+
+proc sql;
+create table PERF_feb25ODC_BASEfinal as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_feb25
+from Risk_deck_ppd_feb25ODC_BASE1 a
+left join PERF_FEB25ODC_BASE2 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+proc sql;
+create table pdd_feb as
+select a.*, case when risk_band_feb25 = '' then   risk_band_ds_feb25 else risk_band_feb25
+end as  riskband_feb_f from PERF_feb25ODC_BASEfinal a;
+
+
+data pdd_feb1 (drop=risk_band_ds_feb25 risk_band_feb25 );
+set pdd_feb;
+
+
+
+/* Mar25 */
+data bscore_mar25;
+set RAJENDRA.BSCORE_MAR25_RE;
+	 if Bscore_Decile in  ('9')      then risk_band = "Very High";
+else if Bscore_Decile in ('7','8')   then risk_band = "High";
+else if Bscore_Decile in ('4','5','6') then risk_band = "Medium";
+else if Bscore_Decile in ('2','3')   then risk_band = "Low";
+else if Bscore_Decile in ('0','1')   then risk_band = "Very Low";
+else if missing(Bscore_Decile)   then risk_band = "NA";
+run;
+
+proc sql;
+create table Risk_deck_ppd_mar25ODC_BASE1 as 
+select distinct a.*,
+				b.risk_band as risk_band_mar25 
+				
+from pdd_feb1 a
+left join bscore_mar25 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+
+data PERF_MAR25ODC_BASE2;
+set RAJENDRA.BSCORE_MAR25_DS;
+if prob_bad ne '' then risk_band_ds = "Very High+";
+run;
+
+proc sql;
+create table PERF_mar25ODC_BASEfinal as 
+select distinct a.*,
+				b.risk_band_ds as risk_band_ds_mar25
+from Risk_deck_ppd_mar25ODC_BASE1 a
+left join PERF_MAR25ODC_BASE2 b
+on input(a.peopleserno,10.) = b.peopleserno;
+Quit;
+
+proc sql;
+create table pdd_mar as
+select a.*, case when risk_band_mar25 = '' then   risk_band_ds_mar25 else risk_band_mar25
+end as  riskband_mar_f from PERF_mar25ODC_BASEfinal a;
+
+
+data pdd_mar1 (drop=risk_band_ds_mar25 risk_band_mar25 );
+set pdd_mar;
+
+
+/*liab  */
+data newcca;
+set pdd_mar1;
+format ccreated date9.;
+ccreated = input(creationdate,yymmdd10.);
+
+
+proc sql;
+create table Liab_TL1_trf as  
+select distinct a.*,b.score as trf_scr, b.BCC_DATE as trf_dt format date9.
+from newcca as a 
+left join SAME_OLD.LIAB_TURF2425 as b
+on a.crn= input(b.crn,10.);
+
+proc sort data = Liab_TL1_trf;
+by serno trf_dt ;
+run;
+
+data Liab_TL1_trfa;
+set Liab_TL1_trf;
+diffn  = intck ('Month', ccreated, trf_dt);
+
+data Liab_TL1_trfb;
+set Liab_TL1_trfa;
+where diffn <0;
+
+ 
+data Liab_TL1_trf2;
+set Liab_TL1_trfb;
+by serno ;
+if last.serno then h=1;
+else h+1;
+ 
+data Liab_TL1_trf3;
+set Liab_TL1_trf2;
+where h=1;
+
+
+/*asset  */
+
+proc sql;
+create table asst_TL1_trf as 
+select distinct a.*,b.score as trf_scr, b.BCC_DATE as trf_dt
+from newcca as a 
+left join SAME_OLD.ASSET_TURF2425 as b
+on a.crn=b.crn;
+
+
+proc sort data = asst_TL1_trf;
+by serno trf_dt ;
+run;
+
+data asst_TL1_trfa;
+set asst_TL1_trf;
+diffn  = intck ('Month', ccreated, trf_dt);
+ 
+data asst_TL1_trfb;
+set asst_TL1_trfa;
+where diffn <0;
+ 
+data asst_TL1_trf2;
+set asst_TL1_trfb;
+by serno ;
+if last.serno then h=1;
+else h+1;
+ 
+data asst_TL1_trf3;
+set asst_TL1_trf2;
+where h=1;
+
+
+
+/*cc  */
+
+proc sql;
+create table cc_TL1_trf as 
+select distinct a.*,b.score as trf_scr, b.BCC_DATE as trf_dt
+from newcca as a 
+left join SAME_OLD.CC_TURF2425 as b
+on a.crn=b.crn;
+
+
+proc sort data = cc_TL1_trf;
+by serno trf_dt ;
+run;
+
+data cc_TL1_trfa;
+set cc_TL1_trf;
+diffn  = intck ('Month', ccreated, trf_dt);
+ 
+data cc_TL1_trfb;
+set cc_TL1_trfa;
+where diffn <0;
+ 
+data cc_TL1_trf2;
+set cc_TL1_trfb;
+by serno ;
+if last.serno then h=1;
+else h+1;
+ 
+data cc_TL1_trf3;
+set cc_TL1_trf2;
+where h=1;
+
+
+
+
+data Liab_TL1_trf4 (drop= trf_scr);
+set Liab_TL1_trf3;
+trf_scr1= input(trf_scr,10.);
+
+data Liab_TL1_trf4 (drop =trf_scr1);
+set Liab_TL1_trf4;
+trf_scr= trf_scr1;
+
+
+data turf_tl;
+set asst_TL1_trf3 cc_TL1_trf3 Liab_TL1_trf4;
+
+proc sort data = turf_tl;
+by serno trf_dt ;
+run;
+ 
+data turf_tla (drop = diffn h ccreate_date);
+set turf_tl;
+
+data turf_t2;
+set turf_tla;
+by serno ;
+if last.serno then a=1;
+else a+1;
+ 
+data turf_t3;
+set turf_t2;
+where a=1 and not missing(trf_dt) and not missing(trf_scr);
+
+/* data turf_final ( keep = serno caccserno trf_scr trf_dt ccreated); */
+/* set turf_t3; */
+/*  */
+/*  */
+/* data tl_final ( keep = serno caccserno score bcc_new ccreated); */
+/* set new_tl2; */
+/*  */
+/* data turf_final1 (rename=(trf_scr = score trf_dt =bcc_new  )); */
+/* set turf_final; */
+/* run; */
+
+/*cibil  */
+
+PROC SQL;
+CREATE TABLE Liab_TL AS 
+	SELECT DISTINCT
+		CRN ,
+		score as score length=3,
+		BCC_DATE as bcc_new
+	FROM BIUBUDLI.TL_MST_liab;
+QUIT;
+
+ 
+PROC SQL;
+CREATE TABLE asst_TL_cc AS 
+	SELECT DISTINCT
+		CRN ,
+		score as score length=3,
+		BCC_DATE as bcc_new
+	FROM BIUBUDLI.TL_MST;
+QUIT;
+
+ 
+PROC SQL;
+CREATE TABLE cc_TL_cc AS 
+	SELECT DISTINCT
+		CRN ,
+		score as score length=3,
+		BCC_DATE as bcc_new
+	FROM BIUBUDLI.TL_MST_CC;
+QUIT;
+
+/*Liab  */
+
+
+proc sql;
+create table Liab_TL1 as 
+select distinct a.*,b.score as trf_scr , b.bcc_new as trf_dt
+from newcca as a 
+left join Liab_TL as b
+on a. crn= b.crn;
+
+proc sort data = Liab_TL1;
+by serno trf_dt ;
+run;
+
+
+data Liab_TLa;
+set Liab_TL1;
+diff  = intck ('Month', ccreated, trf_dt);
+ 
+data Liab_TLb;
+set Liab_TLa;
+where diff <0;
+
+
+
+/*aset  */
+
+proc sql;
+create table asst_TL1 as 
+select distinct a.*,b.score as trf_scr , b.bcc_new as trf_dt
+from newcca as a 
+left join asst_TL_cc as b
+on a. crn= b.crn;
+
+proc sort data = asst_TL1;
+by serno trf_dt ;
+run;
+
+
+data asst_TLa;
+set asst_TL1;
+diff  = intck ('Month', ccreated, trf_dt);
+ 
+data asst_TLb;
+set asst_TLa;
+where diff <0;
+
+ 
+data asst_TL2;
+set asst_TLb;
+by serno ;
+if last.serno then f=1;
+else f+1;
+ 
+data asst_TL3;
+set asst_TL2;
+where f=1;
+
+
+/* cc */
+proc sql;
+create table cc_TL1 as 
+select distinct a.*,b.score as trf_scr , b.bcc_new as trf_dt
+from newcca as a 
+left join cc_TL_cc as b
+on a. crn= b.crn;
+
+
+proc sort data = cc_TL1;
+by serno trf_dt ;
+run;
+
+
+data cc_TLa;
+set cc_TL1;
+diff  = intck ('Month', ccreated, trf_dt);
+ 
+data cc_TLb;
+set cc_TLa;
+where diff <0;
+
+ 
+data cc_TL2;
+set cc_TLb;
+by serno ;
+if last.serno then f=1;
+else f+1;
+ 
+data cc_TL3;
+set cc_TL2;
+where f=1;
+
+
+data new_tl;
+set cc_TL3 asst_TL3 Liab_TLb;
+
+proc sort data = new_tl;
+by serno trf_dt ;
+run;
+ 
+data new_tla (drop = diff f ccreate_date);
+set new_tl;
+
+data new_tl2;
+set new_tla;
+by serno ;
+if last.serno then a=1;
+else a+1;
+ 
+data new_tl3;
+set new_tl2;;
+where a=1 and not missing(trf_dt) and not missing(trf_scr);
+
+
+data overall_tl;
+set turf_t3 new_tl3;
+
+
+proc sort data = overall_tl;
+by serno trf_dt ;
+run;
+ 
+data overall_t2;
+set overall_tl;
+by serno ;
+if last.serno then b=1;
+else b+1;
+ 
+data overall_t3;
+set overall_t2;
+where b=1;
+
+
+
+
+
